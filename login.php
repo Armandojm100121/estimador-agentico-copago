@@ -1,0 +1,239 @@
+<?php
+// login.php  -  Inicio de sesión y registro reales, validados contra la BD.
+require __DIR__ . '/auth.php';
+require __DIR__ . '/db.php';
+
+// Si ya está logueado, directo al estimador.
+if (estaLogueado()) {
+    header('Location: index.php');
+    exit;
+}
+
+$error   = '';
+$modo    = $_POST['modo'] ?? 'login';   // 'login' o 'registro'
+$emailOld = trim($_POST['email'] ?? '');
+
+// Cargar planes para el desplegable del registro.
+$planes = [];
+try {
+    $planes = getDB()
+        ->query("SELECT id, aseguradora, nombre FROM planes ORDER BY aseguradora, nombre")
+        ->fetchAll();
+} catch (Throwable $e) {
+    $error = 'No se pudo conectar con la base de datos. ¿Está MySQL activo en XAMPP?';
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
+    try {
+        $db = getDB();
+
+        if ($modo === 'registro') {
+            // ---- Crear cuenta ----
+            $nombre  = trim($_POST['nombre'] ?? '');
+            $email   = trim($_POST['email'] ?? '');
+            $pass    = (string) ($_POST['password'] ?? '');
+            $planId  = (int) ($_POST['plan_id'] ?? 0);
+
+            if ($nombre === '' || $email === '' || $pass === '') {
+                throw new RuntimeException('Completa nombre, correo y contraseña.');
+            }
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                throw new RuntimeException('El correo no tiene un formato válido.');
+            }
+            if (strlen($pass) < 6) {
+                throw new RuntimeException('La contraseña debe tener al menos 6 caracteres.');
+            }
+            if ($planId <= 0) {
+                throw new RuntimeException('Elige tu plan de seguro.');
+            }
+
+            // ¿Ya existe el correo?
+            $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ?");
+            $stmt->execute([$email]);
+            if ($stmt->fetch()) {
+                throw new RuntimeException('Ese correo ya está registrado. Inicia sesión.');
+            }
+
+            $hash = password_hash($pass, PASSWORD_DEFAULT);
+            $stmt = $db->prepare(
+                "INSERT INTO usuarios (nombre, email, password_hash, plan_id) VALUES (?, ?, ?, ?)"
+            );
+            $stmt->execute([$nombre, $email, $hash, $planId]);
+            $nuevoId = (int) $db->lastInsertId();
+
+            // Etiqueta del plan para la sesión.
+            $stmt = $db->prepare("SELECT aseguradora, nombre FROM planes WHERE id = ?");
+            $stmt->execute([$planId]);
+            $p = $stmt->fetch();
+            $etiqueta = $p ? ($p['aseguradora'] . ' - ' . $p['nombre']) : '';
+
+            iniciarSesionUsuario([
+                'id' => $nuevoId, 'nombre' => $nombre, 'email' => $email,
+                'plan_id' => $planId, 'plan_etiqueta' => $etiqueta,
+            ]);
+            header('Location: index.php');
+            exit;
+
+        } else {
+            // ---- Iniciar sesión ----
+            $email = trim($_POST['email'] ?? '');
+            $pass  = (string) ($_POST['password'] ?? '');
+            if ($email === '' || $pass === '') {
+                throw new RuntimeException('Escribe tu correo y contraseña.');
+            }
+
+            $stmt = $db->prepare(
+                "SELECT u.id, u.nombre, u.email, u.password_hash, u.plan_id,
+                        p.aseguradora, p.nombre AS plan_nombre
+                 FROM usuarios u
+                 LEFT JOIN planes p ON p.id = u.plan_id
+                 WHERE u.email = ?"
+            );
+            $stmt->execute([$email]);
+            $u = $stmt->fetch();
+
+            if (!$u || !password_verify($pass, $u['password_hash'])) {
+                throw new RuntimeException('Correo o contraseña incorrectos.');
+            }
+
+            $etiqueta = $u['aseguradora']
+                ? ($u['aseguradora'] . ' - ' . $u['plan_nombre']) : '';
+
+            iniciarSesionUsuario([
+                'id' => $u['id'], 'nombre' => $u['nombre'], 'email' => $u['email'],
+                'plan_id' => $u['plan_id'], 'plan_etiqueta' => $etiqueta,
+            ]);
+            header('Location: index.php');
+            exit;
+        }
+    } catch (Throwable $e) {
+        $error = $e->getMessage();
+    }
+}
+
+$h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estimador Copago — Iniciar sesión</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#e9e6dd;font-family:'IBM Plex Sans',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  a{color:#0f5c5c;text-decoration:none;cursor:pointer}
+  a:hover{color:#2fbf71}
+  input,select{font-family:'IBM Plex Sans',sans-serif}
+  input::placeholder{color:#9aa8a2}
+  .sora{font-family:'Sora',sans-serif}
+  .shell{width:1080px;max-width:100%;background:#fff;border-radius:28px;overflow:hidden;box-shadow:0 30px 70px -40px rgba(16,35,31,.45);display:grid;grid-template-columns:1fr 1fr;min-height:640px}
+  .field{width:100%;border:1px solid #d8ddd8;background:#f8faf8;border-radius:12px;padding:13px 15px;font-size:14px;color:#10231f;outline:none;transition:border-color .15s,background .15s}
+  .field:focus{border-color:#0f5c5c;background:#fff}
+  .btn-primary{width:100%;background:#0f5c5c;border:none;color:#fff;font-family:'Sora',sans-serif;font-weight:600;font-size:15px;padding:14px;border-radius:12px;cursor:pointer;transition:background .15s}
+  .btn-primary:hover{background:#12786b}
+  .lbl{font-size:12.5px;font-weight:600;color:#334741;display:block;margin-bottom:7px}
+  .err{background:#fdeaea;border:1px solid #f3c6c6;color:#b23c3c;font-size:13.5px;padding:11px 14px;border-radius:11px;margin-bottom:16px;line-height:1.5}
+  .hidden{display:none}
+  .formside{padding:48px 52px;display:flex;flex-direction:column;justify-content:center;background:#fff}
+  @media(max-width:860px){.shell{grid-template-columns:1fr;min-height:auto}.brand-side{display:none}}
+  @media(max-width:560px){body{padding:14px}.shell{border-radius:20px}.formside{padding:34px 24px}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- BRAND SIDE -->
+  <div class="brand-side" style="background:#0d1f1b;color:#e3efe9;padding:44px 42px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden">
+    <div style="position:absolute;right:-80px;bottom:-80px;width:340px;height:340px;background:radial-gradient(circle,#2fbf71 0%,transparent 70%);opacity:.28"></div>
+    <div style="display:flex;align-items:center;gap:11px;position:relative">
+      <div class="sora" style="width:36px;height:36px;border-radius:10px;background:#2fbf71;display:flex;align-items:center;justify-content:center;color:#053023;font-weight:700;font-size:19px">c</div>
+      <span class="sora" style="font-weight:700;font-size:18px;color:#fff">Estimador Copago</span>
+    </div>
+    <div style="position:relative">
+      <h1 class="sora" style="font-size:30px;font-weight:700;line-height:1.25;letter-spacing:-0.02em;color:#fff">Sabe cuánto vas a pagar, antes de ir al médico.</h1>
+      <p style="font-size:15px;line-height:1.6;color:#9db8ac;margin-top:16px;max-width:38ch">Ingresa tu plan y la IA te dice el copago más accesible para tu tratamiento, en lenguaje simple.</p>
+      <div style="display:flex;gap:26px;margin-top:32px">
+        <div><div class="sora" style="font-size:24px;font-weight:800;color:#7ff0b3">$248</div><div style="font-size:12px;color:#7fa494">ahorro promedio / año</div></div>
+        <div><div class="sora" style="font-size:24px;font-weight:800;color:#7ff0b3">12+</div><div style="font-size:12px;color:#7fa494">aseguradoras en Ecuador</div></div>
+      </div>
+    </div>
+    <div style="position:relative;font-size:12.5px;color:#5f7a70">Tus datos de salud se mantienen privados y cifrados.</div>
+  </div>
+
+  <!-- FORM SIDE -->
+  <div class="formside">
+    <div style="max-width:380px;width:100%;margin:0 auto">
+
+      <?php if ($error): ?>
+        <div class="err">⚠️ <?= $h($error) ?></div>
+      <?php endif; ?>
+
+      <!-- ====== LOGIN ====== -->
+      <div id="panel-login" class="<?= $modo === 'registro' ? 'hidden' : '' ?>">
+        <h2 class="sora" style="font-size:24px;font-weight:700;letter-spacing:-0.02em;color:#10231f">Inicia sesión</h2>
+        <p style="font-size:14px;color:#7a8681;margin-top:6px">Bienvenido de nuevo. Continúa con tu estimación.</p>
+        <form method="post" style="display:flex;flex-direction:column;gap:14px;margin-top:26px">
+          <input type="hidden" name="modo" value="login">
+          <div>
+            <label class="lbl">Correo electrónico</label>
+            <input class="field" type="email" name="email" placeholder="tucorreo@ejemplo.com" value="<?= $h($emailOld) ?>" required>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px"><label class="lbl" style="margin:0">Contraseña</label></div>
+            <input class="field" type="password" name="password" placeholder="••••••••" required>
+          </div>
+          <button class="btn-primary" type="submit" style="margin-top:6px">Entrar</button>
+        </form>
+        <p style="font-size:13.5px;color:#7a8681;text-align:center;margin-top:22px">¿No tienes cuenta? <a onclick="mostrar('registro')" style="font-weight:600">Regístrate</a></p>
+      </div>
+
+      <!-- ====== REGISTRO ====== -->
+      <div id="panel-registro" class="<?= $modo === 'registro' ? '' : 'hidden' ?>">
+        <h2 class="sora" style="font-size:24px;font-weight:700;letter-spacing:-0.02em;color:#10231f">Crea tu cuenta</h2>
+        <p style="font-size:14px;color:#7a8681;margin-top:6px">Regístrate y elige tu plan para empezar.</p>
+        <form method="post" style="display:flex;flex-direction:column;gap:14px;margin-top:22px">
+          <input type="hidden" name="modo" value="registro">
+          <div>
+            <label class="lbl">Nombre completo</label>
+            <input class="field" type="text" name="nombre" placeholder="Tu nombre" value="<?= $h($_POST['nombre'] ?? '') ?>" required>
+          </div>
+          <div>
+            <label class="lbl">Correo electrónico</label>
+            <input class="field" type="email" name="email" placeholder="tucorreo@ejemplo.com" value="<?= $modo === 'registro' ? $h($emailOld) : '' ?>" required>
+          </div>
+          <div>
+            <label class="lbl">Contraseña <span style="color:#9aa8a2;font-weight:400">(mínimo 6 caracteres)</span></label>
+            <input class="field" type="password" name="password" placeholder="••••••••" required>
+          </div>
+          <div>
+            <label class="lbl">Tu plan de seguro</label>
+            <select class="field" name="plan_id" required>
+              <option value="">Selecciona tu plan…</option>
+              <?php foreach ($planes as $p): ?>
+                <option value="<?= (int) $p['id'] ?>"<?= (int)($_POST['plan_id'] ?? 0) === (int)$p['id'] ? ' selected' : '' ?>>
+                  <?= $h($p['aseguradora'] . ' — ' . $p['nombre']) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <button class="btn-primary" type="submit" style="margin-top:6px">Crear cuenta</button>
+        </form>
+        <p style="font-size:13.5px;color:#7a8681;text-align:center;margin-top:22px">¿Ya tienes cuenta? <a onclick="mostrar('login')" style="font-weight:600">Inicia sesión</a></p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  function mostrar(cual){
+    document.getElementById('panel-login').classList.toggle('hidden', cual !== 'login');
+    document.getElementById('panel-registro').classList.toggle('hidden', cual !== 'registro');
+  }
+</script>
+</body>
+</html>
