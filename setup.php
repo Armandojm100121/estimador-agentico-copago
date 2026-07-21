@@ -21,6 +21,30 @@ $add = function (bool $ok, string $msg) use (&$pasos) { $pasos[] = [$ok, $msg]; 
 try {
     $db = getDB();
 
+    // 0) Datos base (planes, hospitales, especialidades, coberturas).
+    //    Si la base está vacía, los importa desde el backup del repositorio.
+    $tieneBase = false;
+    try {
+        $tieneBase = ((int) $db->query("SELECT COUNT(*) FROM planes")->fetchColumn()) > 0;
+    } catch (Throwable $e) {
+        $tieneBase = false;  // la tabla aún no existe
+    }
+    if (!$tieneBase) {
+        $backup = __DIR__ . '/copago_backup_2026-05-21.sql';
+        if (is_file($backup)) {
+            $sql = str_replace("\r\n", "\n", file_get_contents($backup));
+            $sql = preg_replace('/^--.*$/m', '', $sql);           // quita comentarios --
+            foreach (array_filter(array_map('trim', explode(";\n", $sql))) as $stmt) {
+                if ($stmt !== '') { $db->exec($stmt); }
+            }
+            $add(true, "Datos base importados desde el backup (planes, hospitales, coberturas)");
+        } else {
+            $add(false, "No se encontró el backup base (copago_backup_2026-05-21.sql)");
+        }
+    } else {
+        $add(true, "Datos base ya presentes");
+    }
+
     // 1) Tabla usuarios
     $db->exec("CREATE TABLE IF NOT EXISTS `usuarios` (
         `id` INT NOT NULL AUTO_INCREMENT,
