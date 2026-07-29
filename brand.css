@@ -1,0 +1,117 @@
+/* brand.css  -  Sistema de diseño de SaludClara (#12 consistencia de marca).
+   Centraliza colores, radios y sombras en variables (design tokens) para que
+   TODAS las pantallas usen exactamente la misma identidad visual.
+   Incluye además utilidades de accesibilidad (#13) y de carga (#11). */
+
+:root{
+  /* Colores de marca */
+  --marca:      #0f5c5c;   /* verde petróleo principal */
+  --marca-2:    #12786b;   /* hover / degradado */
+  --acento:     #2fbf71;   /* verde brillante (acciones, éxito) */
+  --tinta:      #10231f;   /* texto principal */
+  --fondo:      #f8faf8;   /* fondo de contenido */
+  --panel:      #0d1f1b;   /* paneles oscuros (sidebar, chat, admin) */
+  --panel-2:    #152b25;   /* tarjetas dentro de paneles oscuros */
+  --muted:      #7a8681;   /* texto secundario */
+  --borde:      #e6e6e2;   /* bordes suaves */
+
+  /* Estados */
+  --exito:      #128a4e;
+  --alerta:     #b5730f;
+  --peligro:    #b23c3c;
+
+  /* Superficies semánticas (TEMA CLARO por defecto) */
+  --bg:           #e9e6dd;   /* fondo de página */
+  --surface:      #ffffff;   /* tarjetas */
+  --surface-2:    #f8faf8;   /* fondo del contenido del estimador */
+  --text:         #10231f;   /* texto principal */
+  --field:        #ffffff;   /* fondo de inputs */
+  --field-border: #d8ddd8;   /* borde de inputs */
+
+  /* Forma y profundidad */
+  --radio:      16px;
+  --radio-lg:   20px;
+  --radio-sm:   11px;
+  --sombra:     0 20px 50px -30px rgba(0,0,0,.4);
+}
+
+/* ===== TEMA OSCURO (#12) ===== */
+/* Se activa con data-theme="dark" en <html>. Solo se redefinen las superficies:
+   los colores de marca y de estado se mantienen para conservar la identidad. */
+[data-theme="dark"]{
+  --bg:           #0b1512;
+  --surface:      #13221e;
+  --surface-2:    #0f1c19;
+  --text:         #e7efeb;
+  --muted:        #94a69e;
+  --borde:        #243530;
+  --field:        #13221e;
+  --field-border: #2c463f;
+  --sombra:       0 20px 50px -30px rgba(0,0,0,.7);
+}
+
+/* Transición suave al cambiar de tema */
+body{ transition: background-color .25s ease, color .25s ease; }
+
+/* Botón flotante para cambiar de tema (lo crea theme.js) */
+#btn-tema{
+  position:fixed; right:18px; bottom:18px; z-index:1500;
+  width:46px; height:46px; border-radius:50%;
+  border:1px solid var(--borde); background:var(--surface); color:var(--text);
+  font-size:20px; cursor:pointer; box-shadow:0 8px 22px -10px rgba(0,0,0,.5);
+  display:flex; align-items:center; justify-content:center;
+}
+#btn-tema:hover{ border-color:var(--acento); }
+
+/* --- Accesibilidad (#13): foco visible y consistente por teclado --- */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible{
+  outline: 3px solid var(--acento);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Enlace para saltar al contenido (lectores de pantalla / teclado) */
+.skip-link{
+  position:absolute; left:-9999px; top:0; z-index:2000;
+  background:var(--marca); color:#fff; padding:10px 16px; border-radius:0 0 10px 0;
+}
+.skip-link:focus{ left:0; }
+
+/* --- Carga (#11): esqueleto con brillo (shimmer) --- */
+.sk{
+  position:relative; overflow:hidden;
+  background:#e9edea; border-radius:8px;
+}
+.sk::after{
+  content:""; position:absolute; inset:0;
+  transform:translateX(-100%);
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,.65), transparent);
+  animation:sk-shimmer 1.3s infinite;
+}
+@keyframes sk-shimmer{ 100%{ transform:translateX(100%); } }
+
+/* --- Carga (#11): puntos de "Clara está pensando" --- */
+.dots{ display:inline-flex; gap:4px; align-items:center; }
+.dots span{
+  width:6px; height:6px; border-radius:50%; background:currentColor;
+  animation:dot-bounce 1.2s infinite ease-in-out both;
+}
+.dots span:nth-child(1){ animation-delay:-.24s; }
+.dots span:nth-child(2){ animation-delay:-.12s; }
+@keyframes dot-bounce{
+  0%,80%,100%{ transform:scale(.5); opacity:.5; }
+  40%{ transform:scale(1); opacity:1; }
+}
+
+/* --- Accesibilidad (#13): respeta a quien pide menos movimiento --- */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+  }
+}

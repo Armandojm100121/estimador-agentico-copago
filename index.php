@@ -5,7 +5,8 @@ require __DIR__ . '/auth.php';
 require __DIR__ . '/db.php';
 requiereLogin();
 
-$u   = usuarioActual();
+$u       = usuarioActual();
+$esAdmin = esAdmin();   // muestra los accesos de administración solo a admins
 $h   = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
 $ini = iniciales($u['nombre']);
 // Etiqueta bonita del plan: "BMI - Cobertura Nacional" -> aseguradora / nombre
@@ -21,6 +22,17 @@ $ciudadActual = $_SESSION['ciudad'] ?? 'Guayaquil';
 if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
     $ciudadActual = $ciudades[0];
 }
+
+// Aviso suave de verificación de correo (#15): true si el usuario aún no confirma.
+$correoNoVerificado = false;
+try {
+    $stv = getDB()->prepare("SELECT email_verificado FROM usuarios WHERE id = ?");
+    $stv->execute([$u['id']]);
+    $ev = $stv->fetchColumn();                 // false si no hay fila
+    $correoNoVerificado = ($ev !== false && (int) $ev === 0);
+} catch (Throwable $e) { $correoNoVerificado = false; }
+// Enlace de verificación en modo demo (sin correo configurado), si viene del registro.
+$verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -31,40 +43,50 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="brand.css">
+<script>(function(){try{var t=localStorage.getItem('tema');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
-  body{background:#0d1f1b;font-family:'IBM Plex Sans',sans-serif}
-  a{color:#0f5c5c;text-decoration:none}
+  body{background:var(--panel);font-family:'IBM Plex Sans',sans-serif}
+  a{color:var(--marca);text-decoration:none}
   a:hover{color:#2fbf71}
   input{font-family:'IBM Plex Sans',sans-serif}
   input::placeholder{color:#9aa8a2}
   ::-webkit-scrollbar{width:8px;height:8px}
   ::-webkit-scrollbar-thumb{background:#cdd6d1;border-radius:8px}
   /* App a pantalla completa con barra lateral colapsable (menú hamburguesa) */
-  .app{width:100%;min-height:100vh;background:#fff;display:grid;grid-template-columns:300px 1fr;color:#10231f;transition:grid-template-columns .25s ease}
+  .app{width:100%;min-height:100vh;background:var(--surface);display:grid;grid-template-columns:300px 1fr;color:var(--text);transition:grid-template-columns .25s ease}
   .app.collapsed{grid-template-columns:0 1fr}
   aside{overflow:hidden}
   .app.collapsed aside{visibility:hidden}
-  .hamburger{width:40px;height:40px;border-radius:11px;border:1px solid #d8ddd8;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;flex-shrink:0}
-  .hamburger:hover{border-color:#0f5c5c}
-  .hamburger span{width:17px;height:2px;background:#334741;border-radius:2px}
+  .hamburger{width:40px;height:40px;border-radius:11px;border:1px solid var(--field-border);background:var(--surface);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;flex-shrink:0}
+  .hamburger:hover{border-color:var(--marca)}
+  .hamburger span{width:17px;height:2px;background:var(--text);border-radius:2px}
   .sora{font-family:'Sora',sans-serif}
   .chip{font-size:12px;background:#1c332d;color:#9db8ac;padding:6px 11px;border-radius:999px;cursor:pointer;border:none}
   .chip:hover{background:#25423a}
-  .btn-primary{background:#0f5c5c;border:none;color:#fff;font-family:'Sora',sans-serif;font-weight:600;font-size:13.5px;padding:10px 18px;border-radius:11px;cursor:pointer}
-  .btn-primary:hover{background:#12786b}
-  .btn-ghost{background:#fff;border:1px solid #d8ddd8;color:#334741;font-size:13.5px;font-weight:500;padding:10px 16px;border-radius:11px;cursor:pointer}
-  .btn-ghost:hover{border-color:#0f5c5c;color:#0f5c5c}
-  .card{background:#fff;border:1px solid #e6e6e2;border-radius:20px;padding:24px}
+  .btn-primary{background:var(--marca);border:none;color:#fff;font-family:'Sora',sans-serif;font-weight:600;font-size:13.5px;padding:10px 18px;border-radius:11px;cursor:pointer}
+  .btn-primary:hover{background:var(--marca-2)}
+  .btn-ghost{background:var(--surface);border:1px solid var(--field-border);color:var(--text);font-size:13.5px;font-weight:500;padding:10px 16px;border-radius:11px;cursor:pointer}
+  .btn-ghost:hover{border-color:var(--marca);color:var(--marca)}
+  .card{background:var(--surface);border:1px solid var(--borde);border-radius:20px;padding:24px;color:var(--text)}
   .nav-item{padding:11px 13px;color:#9db8ac;display:flex;align-items:center;gap:11px;border-radius:10px;font-size:14px;cursor:pointer}
   .nav-item:hover{background:#152b25;color:#e3efe9}
   .nav-item.active{background:#1c332d;color:#fff;font-weight:600}
-  .muted{color:#7a8681}
+  .muted{color:var(--muted)}
   .metrics{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:16px}
   .cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-  .main{padding:32px 38px 34px;display:flex;flex-direction:column;gap:24px;background:#f8faf8;min-width:0}
+  .main{padding:32px 38px 34px;display:flex;flex-direction:column;gap:24px;background:var(--surface-2);min-width:0}
   .backdrop{display:none}
+
+  /* Tema oscuro (#12): remapea los textos y bordes fijos DENTRO de las tarjetas
+     del contenido para que sean legibles sobre superficies oscuras. La barra
+     lateral y el chat ya son oscuros de por sí, así que no se tocan. */
+  [data-theme="dark"] .main .card [style*="color:#10231f"],
+  [data-theme="dark"] .main .card [style*="color:#334741"]{ color:var(--text) !important; }
+  [data-theme="dark"] .main .card [style*="#eef1ee"]{ border-color:var(--borde) !important; }
+  [data-theme="dark"] .main .card{ box-shadow:none }
 
   /* ================= RESPONSIVO (se adapta a cualquier pantalla) ================= */
   /* Pantallas medianas / tablet: el destacado ocupa toda la fila, las otras dos debajo */
@@ -93,6 +115,7 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
 </style>
 </head>
 <body>
+<a href="#main-content" class="skip-link">Saltar al contenido</a>
 <div class="app" id="app">
   <!-- Fondo oscuro que aparece al abrir el menú en móvil (se cierra al tocarlo) -->
   <div class="backdrop" onclick="toggleMenu()"></div>
@@ -108,7 +131,7 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
       <div style="font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:#7fa494;margin-bottom:9px">Tu plan activo</div>
       <div style="font-size:14px;line-height:1.5;color:#e3efe9;font-weight:500"><?= $h($planTxt) ?></div>
       <label style="display:block;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:#7fa494;margin:14px 0 7px">Ciudad de atención</label>
-      <select id="citySelect" onchange="cambiarCiudad(this.value)"
+      <select id="citySelect" aria-label="Ciudad de atención" onchange="cambiarCiudad(this.value)"
         style="width:100%;background:#0d1f1b;color:#e3efe9;border:1px solid #2c463f;border-radius:10px;padding:9px 11px;font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;cursor:pointer;outline:none">
         <?php foreach ($ciudades as $c): ?>
           <option value="<?= $h($c) ?>"<?= $c === $ciudadActual ? ' selected' : '' ?>><?= $h($c) ?></option>
@@ -116,12 +139,20 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
       </select>
     </div>
 
-    <nav style="display:flex;flex-direction:column;gap:3px">
+    <nav aria-label="Navegación principal" style="display:flex;flex-direction:column;gap:3px">
       <div class="nav-item active" onclick="cerrarMenuMovil()">◈ Recomendación</div>
       <div class="nav-item" onclick="cerrarMenuMovil();document.getElementById('chat-input').focus()">✦ Chat con la IA</div>
       <div class="nav-item" onclick="cerrarMenuMovil();reiniciar()">◷ Nueva consulta</div>
       <a href="historial.php" class="nav-item" style="color:#9db8ac;text-decoration:none">◱ Historial</a>
     </nav>
+
+    <?php if ($esAdmin): ?>
+      <!-- Único acceso al ÁREA DE ADMINISTRACIÓN (pantalla aparte). Solo lo ve el admin. -->
+      <a href="metricas.php" style="display:flex;align-items:center;gap:10px;background:#152b25;border:1px solid #2c463f;border-radius:12px;padding:12px 14px;text-decoration:none;color:#cfe0d8">
+        <span style="font-size:16px">🛡️</span>
+        <span><span style="display:block;font-size:13.5px;font-weight:600;color:#fff">Panel de administración</span><span style="font-size:11.5px;color:#7fa494">Métricas · Gestión · Evaluación</span></span>
+      </a>
+    <?php endif; ?>
 
     <div style="background:#152b25;border-radius:14px;padding:15px">
       <div style="font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:#7fa494;margin-bottom:8px">Cómo funciona</div>
@@ -138,7 +169,7 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
   </aside>
 
   <!-- MAIN -->
-  <main class="main">
+  <main class="main" id="main-content">
 
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
       <div style="display:flex;align-items:flex-start;gap:14px">
@@ -150,6 +181,19 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
       </div>
       <button id="btnPdf" class="btn-ghost" onclick="descargarPDF()" disabled title="Haz una consulta para poder descargar el comprobante" style="opacity:.45;cursor:not-allowed">⬇ Descargar PDF</button>
     </div>
+
+    <?php if ($correoNoVerificado): ?>
+    <!-- Aviso suave de verificación de correo (#15) -->
+    <div style="display:flex;gap:12px;align-items:flex-start;background:#fdf3e6;border:1px solid #f0d9b5;color:#8a5a12;border-radius:14px;padding:13px 16px;font-size:13.5px;line-height:1.5">
+      <span style="font-size:17px">✉️</span>
+      <div>
+        <b>Confirma tu correo.</b> Te enviamos un enlace de verificación a <b><?= $h($u['email']) ?></b>. Revisa tu bandeja (y spam).
+        <?php if ($verifyDemoLink): ?>
+          <div style="margin-top:6px;word-break:break-all">Modo demo: <a href="<?= $h($verifyDemoLink) ?>" style="color:#8a5a12;text-decoration:underline">abre este enlace para verificar</a>.</div>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php unset($_SESSION['verify_demo_link']); endif; ?>
 
     <!-- metric row -->
     <div class="metrics">
@@ -171,7 +215,8 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
       </div>
     </div>
 
-    <!-- Aviso de autorización previa / cobertura (se llena por JS) -->
+    <!-- Triaje de urgencias (verde/amarillo/rojo) y aviso de autorización (se llenan por JS) -->
+    <div id="triajeNotice"></div>
     <div id="authNotice"></div>
 
     <div class="cols">
@@ -215,7 +260,8 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
             <div><div class="sora" style="font-weight:600;font-size:14px;color:#fff">Clara · Asistente IA</div><div style="font-size:11.5px;color:#7fa494">Te dice tu especialista y tu copago</div></div>
           </div>
 
-          <div id="chat-log" style="display:flex;flex-direction:column;gap:12px;flex:1;overflow-y:auto;max-height:300px">
+          <div id="chat-log" role="log" aria-live="polite" aria-label="Conversación con Clara, asistente de salud"
+               style="display:flex;flex-direction:column;gap:12px;flex:1;overflow-y:auto;max-height:300px">
             <!-- las burbujas se agregan por JS -->
           </div>
 
@@ -226,8 +272,8 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
           </div>
 
           <div style="display:flex;align-items:center;gap:9px;background:#fff;border-radius:13px;padding:6px 6px 6px 15px">
-            <input id="chat-input" placeholder="Cuéntame cómo te sientes…" style="border:none;outline:none;flex:1;font-size:13.5px;color:#10231f;background:transparent" onkeydown="if(event.key==='Enter')enviar()">
-            <button id="send-btn" onclick="enviar()" style="background:#2fbf71;border:none;width:36px;height:36px;border-radius:10px;color:#053023;font-size:17px;cursor:pointer">↑</button>
+            <input id="chat-input" aria-label="Escribe tu síntoma o molestia" placeholder="Cuéntame cómo te sientes…" style="border:none;outline:none;flex:1;font-size:13.5px;color:#10231f;background:transparent" onkeydown="if(event.key==='Enter')enviar()">
+            <button id="send-btn" onclick="enviar()" aria-label="Enviar mensaje a Clara" style="background:#2fbf71;border:none;width:36px;height:36px;border-radius:10px;color:#053023;font-size:17px;cursor:pointer">↑</button>
           </div>
         </div>
       </div>
@@ -269,6 +315,7 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
     document.getElementById('desglose').innerHTML = '<div class="muted" style="font-size:13.5px;line-height:1.6;padding:8px 0">Cuando la IA identifique tu especialista, aquí verás el detalle.</div>';
     document.getElementById('comparacion').innerHTML = '<div class="muted" style="font-size:13.5px;line-height:1.6">Aún sin datos. La comparación aparece cuando la IA calcula tu copago.</div>';
     document.getElementById('authNotice').innerHTML = '';
+    document.getElementById('triajeNotice').innerHTML = '';
     ultimoDatos = null; pdfBtn(false);
   }
 
@@ -382,18 +429,146 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
     log.scrollTop = log.scrollHeight;
     return b;
   }
+  // Enruta el resultado de la herramienta que usó el agente al render correcto.
+  //  - estimacion (ciudad actual)   -> pinta el dashboard completo
+  //  - estimacion (otra ciudad)     -> tarjeta compacta en el chat (no toca el dashboard)
+  //  - comparacion_planes           -> tarjeta comparativa en el chat
+  //  - explicacion_cobertura        -> tarjeta de transparencia en el chat
+  function manejarDatos(d){
+    if(!d) return;
+    if(d.tipo === 'comparacion_planes'){ cardComparacionPlanes(d); return; }
+    if(d.tipo === 'explicacion_cobertura'){ cardExplicacionCobertura(d); return; }
+    // estimacion (buscar_copago o buscar_por_ciudad)
+    if(d.ciudad && d.ciudad !== ciudadActual){ cardEstimacionOtraCiudad(d); return; }
+    if(d.recomendado || d.cubierto === false){ pintarResultado(d); }
+  }
+
+  // Inserta una tarjeta clara (para el chat oscuro) como burbuja de ancho completo.
+  function chatCard(innerHTML){
+    const c = document.createElement('div');
+    c.style.cssText = 'align-self:stretch;background:#fff;color:#10231f;border-radius:14px;padding:15px 16px;font-size:13px;line-height:1.5';
+    c.innerHTML = innerHTML;
+    log.appendChild(c);
+    log.scrollTop = log.scrollHeight;
+    return c;
+  }
+
+  // #5 · Tarjeta: comparación de planes (qué conviene contratar)
+  function cardComparacionPlanes(d){
+    if(d.error || !Array.isArray(d.planes) || !d.planes.length){
+      chatCard('<b>Comparar planes</b><div style="color:#7a8681;margin-top:6px">No hay planes con cobertura para ' + esc(d.especialidad||'esa especialidad') + ' en ' + esc(d.ciudad||'esa ciudad') + '.</div>');
+      return;
+    }
+    const filas = d.planes.map((p,i) => {
+      const mejor = i === 0;
+      return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #eef1ee">' +
+        '<div style="min-width:0"><div style="font-weight:' + (mejor?'700':'500') + ';color:' + (mejor?'#0f5c5c':'#10231f') + '">' + esc(p.plan) +
+          (mejor?' <span style="font-size:10.5px;background:#e2f6ec;color:#128a4e;padding:2px 6px;border-radius:6px;margin-left:4px">Conviene</span>':'') + '</div>' +
+          '<div style="font-size:11.5px;color:#7a8681">Cubre ' + (p.porcentaje) + '% · deducible ' + money(p.deducible) + '</div></div>' +
+        '<div class="sora" style="font-weight:' + (mejor?'800':'600') + ';color:' + (mejor?'#0f5c5c':'#334741') + ';white-space:nowrap">' + money(p.mejor_copago) + '</div></div>';
+    }).join('');
+    chatCard('<div style="font-weight:700;margin-bottom:4px">🏆 Qué plan te conviene · ' + esc(d.especialidad) + ' en ' + esc(d.ciudad) + '</div>' +
+      '<div style="font-size:11.5px;color:#7a8681;margin-bottom:8px">Copago más bajo disponible por plan (de menor a mayor)</div>' + filas);
+  }
+
+  // #5 · Tarjeta: explicación de la cobertura (transparencia del cálculo)
+  function cardExplicacionCobertura(d){
+    if(d.error){ chatCard('<b>Tu cobertura</b><div style="color:#7a8681;margin-top:6px">' + esc(d.error) + '</div>'); return; }
+    let html = '<div style="font-weight:700;margin-bottom:8px">🔎 Cómo funciona tu cobertura</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
+        '<span style="background:#eef1ee;color:#334741;padding:4px 10px;border-radius:8px;font-size:12px">Cubre <b>' + d.porcentaje + '%</b></span>' +
+        '<span style="background:#eef1ee;color:#334741;padding:4px 10px;border-radius:8px;font-size:12px">Deducible <b>' + money(d.deducible) + '</b></span>' +
+      '</div>';
+    if(d.ejemplo){
+      const e = d.ejemplo;
+      html += '<div style="font-size:12px;color:#7a8681;margin-bottom:4px">Ejemplo en ' + esc(d.especialidad||'') + ':</div>' +
+        '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eef1ee"><span>Tarifa de referencia</span><b>' + money(e.tarifa) + '</b></div>' +
+        '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eef1ee;color:#128a4e"><span>El seguro cubre (' + d.porcentaje + '%)</span><b>– ' + money(e.cubre_seguro) + '</b></div>' +
+        '<div style="display:flex;justify-content:space-between;padding:7px 0"><span style="font-weight:600">Base a tu cargo</span><b class="sora" style="color:#0f5c5c">' + money(e.base_paciente) + '</b></div>';
+    }
+    html += '<div style="font-size:11px;color:#a2aca7;margin-top:8px">Los montos exactos por hospital salen de tu póliza (SQL), no del modelo.</div>';
+    chatCard(html);
+  }
+
+  // #5 · Tarjeta: estimación en OTRA ciudad (no repinta el dashboard de la ciudad actual)
+  function cardEstimacionOtraCiudad(d){
+    if(d.cubierto === false || !d.recomendado){
+      chatCard('<b>En ' + esc(d.ciudad||'') + '</b><div style="color:#7a8681;margin-top:6px">Tu plan no cubre ' + esc(d.especialidad||'esa especialidad') + ' en ' + esc(d.ciudad||'esa ciudad') + '.</div>');
+      return;
+    }
+    const opts = (d.opciones||[]).slice(0,4).map((o,i) => {
+      const mejor = o.nombre === d.recomendado.nombre;
+      return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eef1ee">' +
+        '<span style="color:' + (mejor?'#0f5c5c':'#334741') + ';font-weight:' + (mejor?'600':'400') + '">' + esc(o.nombre) + (mejor?' ✓':'') + '</span>' +
+        '<b style="color:' + (mejor?'#0f5c5c':'#334741') + '">' + money(o.copago) + '</b></div>';
+    }).join('');
+    chatCard('<div style="font-weight:700;margin-bottom:6px">📍 ' + esc(d.especialidad||'') + ' en ' + esc(d.ciudad) + '</div>' + opts +
+      '<div style="font-size:11px;color:#a2aca7;margin-top:8px">Esta consulta no cambió tu ciudad seleccionada (' + esc(ciudadActual) + ').</div>');
+  }
+
+  // Nota discreta cuando se activa una defensa (guardrail) del agente.
+  // Es evidencia visible del principio anti-alucinación de la tesis.
+  function notaGuardrail(codigos){
+    const texto = {
+      'G1_mensaje_recortado':               'Se recortó tu mensaje por seguridad (largo máximo).',
+      'G2_especialidad_invalida':           'La IA propuso una especialidad inexistente y el sistema la rechazó.',
+      'G3_monto_alucinado_neutralizado':    'La IA intentó dar un monto y el sistema lo bloqueó: los valores solo salen de tu póliza (SQL).',
+    };
+    codigos.forEach(c => {
+      const n = document.createElement('div');
+      n.style.cssText = 'align-self:center;background:#152b25;color:#7fd7a8;border:1px solid #2c463f;font-size:11.5px;line-height:1.45;padding:7px 12px;border-radius:10px;max-width:92%;text-align:center';
+      n.innerHTML = '🛡️ ' + esc(texto[c] || ('Guardrail activado: ' + c));
+      log.appendChild(n);
+    });
+    log.scrollTop = log.scrollHeight;
+  }
+
+  // #11 · Indicador animado de "Clara está pensando" (puntos que rebotan)
   function typing(){
     const b = document.createElement('div');
-    b.style.cssText = 'align-self:flex-start;background:#1c332d;color:#7fa494;font-size:13px;padding:11px 14px;border-radius:14px 14px 14px 4px';
-    b.textContent = 'Clara está pensando…';
+    b.setAttribute('aria-label', 'Clara está escribiendo');
+    b.style.cssText = 'align-self:flex-start;background:#1c332d;color:#7fa494;font-size:13px;padding:12px 16px;border-radius:14px 14px 14px 4px';
+    b.innerHTML = '<span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>';
     log.appendChild(b); log.scrollTop = log.scrollHeight;
     return b;
+  }
+
+  // #11 · Skeletons de carga en las tarjetas de resultado (solo en la 1ª estimación,
+  //       para no borrar un resultado previo mientras Clara responde una pregunta).
+  function mostrarSkeletons(){
+    if(ultimoDatos) return;               // ya hay un resultado: no lo tapamos
+    document.getElementById('m-hospital').innerHTML = '<span class="sk" style="display:inline-block;width:150px;height:20px"></span>';
+    document.getElementById('m-copago').innerHTML   = '<span class="sk" style="display:inline-block;width:110px;height:40px;background:rgba(255,255,255,.25)"></span>';
+    const filaSk = '<div class="sk" style="height:16px;margin:12px 0"></div>';
+    document.getElementById('desglose').innerHTML   = filaSk + filaSk + filaSk;
+    document.getElementById('comparacion').innerHTML = filaSk + filaSk + filaSk;
+  }
+  function quitarSkeletons(){
+    // Si tras responder no hubo estimación nueva y no había una previa, vuelve al vacío.
+    if(ultimoDatos) return;
+    if(document.querySelector('#m-copago .sk')){ resetResultado(); }
+  }
+
+  // #14 · Animación count-up: el número sube suave hasta su valor final.
+  function countUp(el, destino, {prefijo='', sufijo='', dec=2, ms=650}={}){
+    const inicio = performance.now();
+    const paso = (ahora) => {
+      const t = Math.min(1, (ahora - inicio) / ms);
+      const e = 1 - Math.pow(1 - t, 3);          // easing suave (easeOutCubic)
+      el.textContent = prefijo + (destino * e).toFixed(dec) + sufijo;
+      if(t < 1) requestAnimationFrame(paso);
+      else el.textContent = prefijo + destino.toFixed(dec) + sufijo;
+    };
+    requestAnimationFrame(paso);
   }
 
   // ---- Pintar el resultado real en el dashboard ----
   function pintarResultado(d){
     if(!d) return;
     const auth = document.getElementById('authNotice');
+
+    // Triaje de urgencias (#6): siempre que haya estimación, muéstralo arriba.
+    pintarTriaje(d.triaje);
 
     // Caso: el plan NO cubre esta especialidad en la ciudad elegida
     if(d.cubierto === false || !d.recomendado){
@@ -420,12 +595,16 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
     const reqAuth = d.requiere_autorizacion === true;
     ultimoDatos = d; pdfBtn(true);   // habilita el comprobante PDF
 
-    // Métricas
+    // Métricas (con animación count-up #14: los números suben suave hasta su valor)
     document.getElementById('m-hospital').textContent = best.nombre;
-    document.getElementById('m-copago').textContent = money(best.copago);
+    countUp(document.getElementById('m-copago'), Number(best.copago), {prefijo:'$', dec:2});
     document.getElementById('m-copago-sub').textContent = 'copago en ' + (d.especialidad || 'tu consulta');
-    document.getElementById('m-ahorro').textContent = money(ahorro);
-    document.getElementById('m-cobertura').textContent = (best.porcentaje_cobertura ?? '—') + '%';
+    countUp(document.getElementById('m-ahorro'), Number(ahorro), {prefijo:'$', dec:2});
+    if(best.porcentaje_cobertura == null){
+      document.getElementById('m-cobertura').textContent = '—';
+    } else {
+      countUp(document.getElementById('m-cobertura'), Number(best.porcentaje_cobertura), {sufijo:'%', dec:0});
+    }
 
     // Aviso de autorización previa (dato real del SQL, no inventado)
     if(reqAuth){
@@ -474,6 +653,36 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
         '<div style="height:11px;background:#eef1ee;border-radius:6px;overflow:hidden"><div style="width:' + pct + '%;height:100%;background:' + color + ';border-radius:6px"></div></div></div>';
     });
   }
+  // Triaje de urgencias (#6): banner de color según el nivel verde/amarillo/rojo.
+  function pintarTriaje(t){
+    const cont = document.getElementById('triajeNotice');
+    if(!t || !t.nivel){ cont.innerHTML = ''; return; }
+    const estilos = {
+      rojo:     {bg:'#fdeaea', borde:'#f3c6c6', color:'#b23c3c', icono:'🚨'},
+      amarillo: {bg:'#fdf3e6', borde:'#f0d9b5', color:'#b5730f', icono:'⚠️'},
+      verde:    {bg:'#e9f7ef', borde:'#c6ead5', color:'#128a4e', icono:'🟢'},
+    };
+    const s = estilos[t.nivel] || estilos.verde;
+    const nota = t.escalado_por_seguridad
+      ? '<div style="font-size:11.5px;margin-top:6px;opacity:.85">🛡️ Nivel elevado automáticamente por la red de seguridad clínica (ante la duda, se prioriza tu seguridad).</div>'
+      : '';
+    cont.innerHTML =
+      '<div style="display:flex;gap:13px;align-items:flex-start;background:' + s.bg + ';border:1px solid ' + s.borde +
+        ';border-radius:16px;padding:15px 18px' + (t.nivel==='rojo' ? ';box-shadow:0 0 0 3px rgba(178,60,60,.12)' : '') + '">' +
+        '<span style="font-size:20px;line-height:1.2">' + s.icono + '</span>' +
+        '<div style="color:' + s.color + '">' +
+          '<div class="sora" style="font-weight:700;font-size:14.5px;margin-bottom:2px">Triaje: ' + esc(t.etiqueta) + '</div>' +
+          '<div style="font-size:13px;line-height:1.5">' + esc(t.mensaje) + '</div>' + nota +
+        '</div></div>';
+    // Para emergencias, además deja una nota visible en el chat.
+    if(t.emergencia){
+      const n = document.createElement('div');
+      n.style.cssText = 'align-self:stretch;background:#3a1414;color:#ffb4b4;border:1px solid #6b2626;font-size:12.5px;line-height:1.5;padding:10px 13px;border-radius:12px;font-weight:600';
+      n.innerHTML = '🚨 ' + esc(t.mensaje);
+      log.appendChild(n); log.scrollTop = log.scrollHeight;
+    }
+  }
+
   // Banner de aviso (autorización / cobertura)
   function banner(bg, borde, texto, icono, html){
     return '<div style="display:flex;gap:12px;align-items:flex-start;background:' + bg + ';border:1px solid ' + borde +
@@ -507,6 +716,7 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
     bubble(msg, true);
     input.value = '';
     const t = typing();
+    mostrarSkeletons();          // #11 · esqueletos mientras llega la estimación
     try {
       const r = await fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({mensaje: msg})});
       const data = await r.json();
@@ -515,14 +725,16 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
         bubble('⚠️ ' + (data.error || 'Ocurrió un error.'), false);
       } else {
         bubble(data.respuesta || '¿Podrías darme un poco más de detalle?', false);
-        if(data.datos && data.datos.recomendado){
-          pintarResultado(data.datos);
+        if(Array.isArray(data.guardrails) && data.guardrails.length){
+          notaGuardrail(data.guardrails);
         }
+        manejarDatos(data.datos);
       }
     } catch(e){
       t.remove();
       bubble('⚠️ Sin conexión con el servidor. Revisa que el servidor y la base de datos estén activos.', false);
     }
+    quitarSkeletons();           // si no hubo estimación nueva, vuelve al estado vacío
     busy = false; sendBtn.disabled = false; input.focus();
   }
   function preguntar(txt){ input.value = txt; enviar(); }
@@ -533,9 +745,21 @@ if ($ciudades && !in_array($ciudadActual, $ciudades, true)) {
     bubble('Listo, empecemos de nuevo. Cuéntame qué síntoma tienes.', false);
   }
 
+  // #13 · Accesibilidad por teclado: los ítems del menú son <div> con onclick.
+  // Los hacemos enfocables y activables con Enter/Espacio, como un botón real.
+  document.querySelectorAll('.nav-item').forEach(el => {
+    if(el.tagName === 'A') return;            // los enlaces ya son accesibles
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.addEventListener('keydown', e => {
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); el.click(); }
+    });
+  });
+
   // Saludo inicial
   bubble('Hola <?= $h($u['nombre']) ?>, soy Clara. Cuéntame qué molestia o síntoma tienes y te diré a qué especialista ir y cuánto pagarías.', false);
   input.focus();
 </script>
+<script src="theme.js"></script>
 </body>
 </html>

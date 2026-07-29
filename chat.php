@@ -14,6 +14,11 @@ header('Content-Type: application/json; charset=utf-8');
 
 require __DIR__ . '/db.php';
 require __DIR__ . '/llm.php';
+require __DIR__ . '/guardrails.php';
+require __DIR__ . '/triaje.php';
+
+// Acumula qué guardrails se activaron en esta petición (se devuelve al front).
+$guardrailsActivos = [];
 
 if (isset($_GET['reset'])) {
     // Solo reinicia la conversación; conserva el login y el plan del usuario.
@@ -44,8 +49,11 @@ if (isset($_GET['set_plan'])) {
         ], JSON_UNESCAPED_UNICODE);
         exit;
     } catch (Throwable $e) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        error_log('[chat.php set_plan] ' . $e->getMessage());
+        http_response_code(($e instanceof RuntimeException) ? 400 : 503);
+        $msg = ($e instanceof RuntimeException) ? $e->getMessage()
+             : 'No se pudo seleccionar el plan. Intenta de nuevo.';
+        echo json_encode(['ok' => false, 'error' => $msg]);
         exit;
     }
 }
@@ -64,8 +72,11 @@ if (isset($_GET['set_ciudad'])) {
         echo json_encode(['ok' => true, 'ciudad' => $ciudad], JSON_UNESCAPED_UNICODE);
         exit;
     } catch (Throwable $e) {
-        http_response_code(500);
-        echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        error_log('[chat.php set_ciudad] ' . $e->getMessage());
+        http_response_code(($e instanceof RuntimeException) ? 400 : 503);
+        $msg = ($e instanceof RuntimeException) ? $e->getMessage()
+             : 'No se pudo cambiar la ciudad. Intenta de nuevo.';
+        echo json_encode(['ok' => false, 'error' => $msg]);
         exit;
     }
 }
@@ -73,12 +84,32 @@ if (isset($_GET['set_ciudad'])) {
 try {
     $db = getDB();
 
+    // #16 · Rate limiting del endpoint de IA: protege contra abuso y controla el
+    // costo de Groq. Ventana deslizante por sesión: máx. RL_MAX peticiones cada
+    // RL_VENTANA segundos. Si se supera, respondemos 429 con mensaje amigable.
+    $RL_MAX     = 15;   // peticiones permitidas...
+    $RL_VENTANA = 60;   // ...por cada 60 segundos
+    $ahora = time();
+    $hits  = $_SESSION['chat_hits'] ?? [];
+    // Conserva solo las marcas de tiempo dentro de la ventana actual.
+    $hits  = array_values(array_filter($hits, fn($t) => $t > $ahora - $RL_VENTANA));
+    if (count($hits) >= $RL_MAX) {
+        $espera = $RL_VENTANA - ($ahora - $hits[0]);
+        http_response_code(429);
+        echo json_encode([
+            'ok'    => false,
+            'error' => "Estás enviando muchas consultas muy rápido. Espera unos $espera segundos e intenta de nuevo.",
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $hits[] = $ahora;
+    $_SESSION['chat_hits'] = $hits;
+
     // 1) Mensaje del paciente (POST JSON desde el front, o ?mensaje= para probar)
     $body = json_decode(file_get_contents('php://input'), true);
     $mensaje = $body['mensaje'] ?? ($_GET['mensaje'] ?? null);
-    if (!$mensaje) {
-        throw new RuntimeException('Falta el parámetro "mensaje".');
-    }
+    // G1 · Guardrail de entrada: rechaza vacío y recorta mensajes gigantes.
+    $mensaje = gr_validar_mensaje($mensaje);
 
     // 2) Catálogos desde la BD (no hardcode: si agregas filas, el agente se entera)
     $especialidades = $db->query("SELECT nombre FROM especialidades ORDER BY nombre")
@@ -86,29 +117,112 @@ try {
     $planes = $db->query("SELECT id, aseguradora, nombre FROM planes ORDER BY id")
                  ->fetchAll();
     $planesEtiquetas = array_map(fn($p) => $p['aseguradora'] . ' - ' . $p['nombre'], $planes);
+    $ciudades = $db->query("SELECT DISTINCT ciudad FROM hospitales ORDER BY ciudad")
+                   ->fetchAll(PDO::FETCH_COLUMN);
 
-    // 3) La herramienta: esto es lo "agéntico". El modelo decide cuándo llamarla.
-    //    El plan y la ciudad NO los pide la herramienta: ya los conocemos (sesión),
-    //    y los inyectamos nosotros. Así el modelo solo decide la ESPECIALIDAD, lo que
-    //    evita fallos de generación con function calling (error 400 de Groq).
-    $tools = [[
-        'type' => 'function',
-        'function' => [
-            'name' => 'buscar_copago',
-            'description' => 'Calcula el copago del paciente y devuelve los hospitales de la red ordenados del más económico al más caro, según la especialidad médica. El plan de seguro y la ciudad ya son conocidos por el sistema.',
-            'parameters' => [
-                'type' => 'object',
-                'properties' => [
-                    'especialidad' => [
-                        'type' => 'string',
-                        'enum' => $especialidades,
-                        'description' => 'Especialidad médica adecuada para el síntoma.',
+    // 3) Las herramientas del agente (function calling). Esto es lo "agéntico":
+    //    el modelo DECIDE cuál llamar según lo que pide el paciente.
+    //    - buscar_copago       : estima el copago (plan y ciudad ya conocidos por la sesión).
+    //    - buscar_por_ciudad   : estima en OTRA ciudad sin cambiar la seleccionada.
+    //    - comparar_planes     : compara TODOS los planes -> cuál conviene contratar.
+    //    - explicar_cobertura  : explica de dónde sale el copago (transparencia).
+    //    El plan y la ciudad por defecto NO se piden como argumento: los conocemos
+    //    por la sesión y los inyectamos nosotros (evita fallos de function calling).
+    $tools = [
+        [
+            'type' => 'function',
+            'function' => [
+                'name' => 'buscar_copago',
+                'description' => 'Calcula el copago del paciente y devuelve los hospitales de la red ordenados del más económico al más caro, según la especialidad médica. El plan de seguro y la ciudad ya son conocidos por el sistema.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'especialidad' => [
+                            'type' => 'string',
+                            'enum' => $especialidades,
+                            'description' => 'Especialidad médica adecuada para el síntoma.',
+                        ],
+                        'nivel_urgencia' => [
+                            'type' => 'string',
+                            'enum' => ['verde', 'amarillo', 'rojo'],
+                            'description' => 'Triaje del síntoma (opcional): "rojo" si es una posible '
+                                . 'emergencia (dolor de pecho, dificultad para respirar, desmayo, sangrado '
+                                . 'abundante, señales de infarto/derrame); "amarillo" si necesita atención '
+                                . 'pronta (fiebre alta, fractura, dolor intenso); "verde" si es de rutina.',
+                        ],
                     ],
+                    // Solo 'especialidad' es obligatorio: mantiene estable la llamada FORZADA
+                    // (Groq/Llama falla si se le exigen varios campos a la vez). El nivel_urgencia
+                    // es best-effort; si el modelo no lo manda, la red de seguridad del triaje decide.
+                    'required' => ['especialidad'],
                 ],
-                'required' => ['especialidad'],
             ],
         ],
-    ]];
+        [
+            'type' => 'function',
+            'function' => [
+                'name' => 'buscar_por_ciudad',
+                'description' => 'Estima el copago en una CIUDAD específica (por ejemplo si el paciente pregunta "¿y en Quito cuánto sería?"), sin cambiar la ciudad seleccionada por el paciente. Usa el plan de seguro que ya conoce el sistema.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'especialidad' => [
+                            'type' => 'string',
+                            'enum' => $especialidades,
+                            'description' => 'Especialidad médica a estimar.',
+                        ],
+                        'ciudad' => [
+                            'type' => 'string',
+                            'enum' => $ciudades,
+                            'description' => 'Ciudad donde el paciente quiere atenderse.',
+                        ],
+                    ],
+                    'required' => ['especialidad', 'ciudad'],
+                ],
+            ],
+        ],
+        [
+            'type' => 'function',
+            'function' => [
+                'name' => 'comparar_planes',
+                'description' => 'Compara TODOS los planes de seguro disponibles para una especialidad y ciudad, y los ordena del copago más bajo al más alto. Úsala cuando el paciente pregunta qué plan le conviene contratar o cuál es más económico. NO usa el plan actual: compara todos.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'especialidad' => [
+                            'type' => 'string',
+                            'enum' => $especialidades,
+                            'description' => 'Especialidad médica sobre la que comparar los planes.',
+                        ],
+                        'ciudad' => [
+                            'type' => 'string',
+                            'enum' => $ciudades,
+                            'description' => 'Ciudad de atención para la comparación (opcional; por defecto la del paciente).',
+                        ],
+                    ],
+                    'required' => ['especialidad'],
+                ],
+            ],
+        ],
+        [
+            'type' => 'function',
+            'function' => [
+                'name' => 'explicar_cobertura',
+                'description' => 'Explica en detalle cómo funciona la cobertura del plan actual del paciente: el porcentaje que cubre el seguro, el deducible y de dónde sale el copago. Úsala cuando el paciente pregunta por qué paga ese valor, cómo se calcula o qué cubre su plan.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'especialidad' => [
+                            'type' => 'string',
+                            'enum' => $especialidades,
+                            'description' => 'Especialidad para dar un ejemplo concreto del cálculo (opcional).',
+                        ],
+                    ],
+                    'required' => [],
+                ],
+            ],
+        ],
+    ];
 
     // 4) Validar que el paciente eligió su plan en la pantalla de bienvenida
     if (empty($_SESSION['plan_etiqueta'])) {
@@ -143,9 +257,17 @@ try {
                 "frase MUY breve avisando que esta atención necesita autorización previa del seguro; " .
                 "si es false, no menciones el tema.\n" .
                 "4) Para los montos SIEMPRE usa la herramienta buscar_copago; nunca inventes precios.\n" .
-                "5) Urgencias: si el síntoma es claramente grave (dolor de pecho intenso, dificultad " .
-                "para respirar), dilo en una frase y recomienda emergencias, pero IGUAL llama la " .
-                "herramienta para mostrar el copago.",
+                "5) Urgencias y TRIAJE: al llamar buscar_copago, clasifica SIEMPRE el nivel_urgencia " .
+                "del síntoma en 'verde' (rutina), 'amarillo' (atención pronta) o 'rojo' (posible " .
+                "emergencia: dolor de pecho, dificultad para respirar, desmayo, sangrado abundante, " .
+                "señales de infarto o derrame). Si es 'rojo', además dilo en una frase y recomienda " .
+                "acudir a emergencias, pero IGUAL llama la herramienta para mostrar el copago.\n" .
+                "6) OTRAS HERRAMIENTAS (úsalas cuando el paciente lo pida, después de la estimación):\n" .
+                "   • Si pregunta qué plan le conviene contratar o cuál es más barato -> llama comparar_planes.\n" .
+                "   • Si pregunta por qué paga ese valor, cómo se calcula o qué cubre su plan -> llama explicar_cobertura.\n" .
+                "   • Si pregunta cuánto sería en OTRA ciudad -> llama buscar_por_ciudad con esa ciudad.\n" .
+                "   Tras cualquiera de estas, responde con UNA frase breve; los detalles se muestran en una tarjeta aparte. " .
+                "Nunca inventes montos: úsalos solo desde las herramientas.",
         ]];
     }
     $_SESSION['messages'][] = ['role' => 'user', 'content' => $mensaje];
@@ -175,16 +297,25 @@ try {
         $choiceArg = 'auto';
     }
 
-    // 6) Primera llamada al modelo (con reintento de seguridad ante fallos de function calling)
+    // 6) Primera llamada al modelo, con reintentos escalonados ante el error 400 de
+    //    function calling de Groq ("Failed to call a function"):
+    //      1º intento: como corresponda al turno (forzado o auto).
+    //      2º intento: en modo 'auto' (por si falló la llamada FORZADA).
+    //      3º intento: SIN herramientas, para que Clara responda al menos en texto
+    //                  y el paciente nunca vea un error crudo.
     try {
         $resp = openaiChat($_SESSION['messages'], $toolsArg, $choiceArg);
     } catch (Throwable $e) {
-        // Si falló la llamada FORZADA a la herramienta (error típico de Groq),
-        // reintenta dejando que el modelo la invoque en modo automático.
-        if ($choiceArg !== 'auto') {
-            $resp = openaiChat($_SESSION['messages'], $toolsArg, 'auto');
-        } else {
-            throw $e;
+        try {
+            if ($choiceArg !== 'auto') {
+                $resp = openaiChat($_SESSION['messages'], $toolsArg, 'auto');
+            } else {
+                throw $e;
+            }
+        } catch (Throwable $e2) {
+            // Último recurso: sin herramientas. El modelo no podrá calcular el copago
+            // en este turno, pero mantiene la conversación viva sin romperse.
+            $resp = openaiChat($_SESSION['messages'], [], 'auto');
         }
     }
     $choice = $resp['choices'][0]['message'];
@@ -192,14 +323,61 @@ try {
 
     $datos = null;
 
-    // 7) ¿El modelo usó la herramienta? (forzada en el turno 2)
+    // 7) ¿El modelo usó alguna herramienta? El agente decide CUÁL según lo que pidió
+    //    el paciente. Aquí despachamos cada llamada al manejador correspondiente.
+    // Texto que alimenta la red de seguridad del triaje (#6). IMPORTANTE: solo los
+    // ÚLTIMOS 2 mensajes del paciente (la consulta actual), NO todo el historial.
+    // Así una molestia vieja (p. ej. "dolor en el pecho" preguntado antes) no
+    // contamina ni escala por error una consulta nueva y distinta (p. ej. fiebre).
+    $userMsgs = [];
+    foreach ($_SESSION['messages'] as $m) {
+        if (($m['role'] ?? '') === 'user') { $userMsgs[] = (string) ($m['content'] ?? ''); }
+    }
+    $sintomasTexto = implode(' ', array_slice($userMsgs, -2));
+
     if (!empty($choice['tool_calls'])) {
         foreach ($choice['tool_calls'] as $tc) {
-            $args      = json_decode($tc['function']['arguments'], true);
-            $ciudadSel = $_SESSION['ciudad'] ?? 'Guayaquil';
-            $planSel   = $_SESSION['plan_etiqueta'];   // el plan lo conocemos por la sesión
-            $resultado = buscarCopago($db, $args['especialidad'] ?? '', $planSel, $planes, $ciudadSel);
-            $datos     = $resultado;
+            $fname        = $tc['function']['name'] ?? '';
+            $args         = json_decode($tc['function']['arguments'], true) ?: [];
+            $ciudadSesion = $_SESSION['ciudad'] ?? 'Guayaquil';
+            $planSel      = $_SESSION['plan_etiqueta'];   // el plan lo conocemos por la sesión
+
+            switch ($fname) {
+                case 'buscar_por_ciudad':
+                    // Estima en la ciudad que pidió el paciente (sin cambiar la de la sesión).
+                    $resultado = buscarCopago($db, $args['especialidad'] ?? '', $planSel, $planes,
+                                              $args['ciudad'] ?? $ciudadSesion, $especialidades);
+                    break;
+
+                case 'comparar_planes':
+                    $resultado = compararPlanes($db, $args['especialidad'] ?? '',
+                                                $args['ciudad'] ?? $ciudadSesion, $especialidades);
+                    break;
+
+                case 'explicar_cobertura':
+                    $resultado = explicarCobertura($db, $planSel, $planes,
+                                                   $args['especialidad'] ?? null, $especialidades);
+                    break;
+
+                case 'buscar_copago':
+                default:
+                    $resultado = buscarCopago($db, $args['especialidad'] ?? '', $planSel, $planes,
+                                              $ciudadSesion, $especialidades);
+                    break;
+            }
+
+            if (!empty($resultado['especialidad_invalida'])) { $guardrailsActivos[] = 'G2_especialidad_invalida'; }
+
+            // #6 · TRIAJE: para las estimaciones, combina el nivel del modelo con la
+            // red de seguridad (que solo escala hacia arriba). Se adjunta al resultado.
+            if (($resultado['tipo'] ?? '') === 'estimacion') {
+                $resultado['triaje'] = triaje_evaluar($args['nivel_urgencia'] ?? null, $sintomasTexto);
+                if (!empty($resultado['triaje']['escalado_por_seguridad'])) {
+                    $guardrailsActivos[] = 'T_triaje_escalado_por_seguridad';
+                }
+            }
+
+            $datos = $resultado;
 
             $_SESSION['messages'][] = [
                 'role'         => 'tool',
@@ -224,7 +402,15 @@ try {
         if (!empty($args['especialidad'])) {
             $ciudadSel = $_SESSION['ciudad'] ?? 'Guayaquil';
             $planSel   = $_SESSION['plan_etiqueta'];
-            $datos     = buscarCopago($db, $args['especialidad'], $planSel, $planes, $ciudadSel);
+            $datos     = buscarCopago($db, $args['especialidad'], $planSel, $planes, $ciudadSel, $especialidades);
+            if (!empty($datos['especialidad_invalida'])) { $guardrailsActivos[] = 'G2_especialidad_invalida'; }
+            // #6 · Triaje también en el camino de respaldo (aquí solo lo aporta la red de seguridad).
+            if (($datos['tipo'] ?? '') === 'estimacion') {
+                $datos['triaje'] = triaje_evaluar($args['nivel_urgencia'] ?? null, $sintomasTexto);
+                if (!empty($datos['triaje']['escalado_por_seguridad'])) {
+                    $guardrailsActivos[] = 'T_triaje_escalado_por_seguridad';
+                }
+            }
         }
         // Quitar la etiqueta de función del texto que ve el usuario.
         $limpio = trim(preg_replace('#<function\b.*?</function>|<function\b.*$#s', '', $choice['content']));
@@ -261,22 +447,66 @@ try {
         }
     }
 
+    // G3 · Anti-alucinación de montos: aunque el modelo escriba un precio en su
+    // texto, se neutraliza. El ÚNICO número que ve el paciente sale del SQL.
+    $textoFinal = $choice['content'] ?? '';
+    [$textoFinal, $huboMonto] = gr_neutralizar_montos($textoFinal);
+    if ($huboMonto) { $guardrailsActivos[] = 'G3_monto_alucinado_neutralizado'; }
+
     echo json_encode([
-        'ok'        => true,
-        'respuesta' => $choice['content'] ?? '',
-        'datos'     => $datos,   // null si el agente solo preguntó el plan
+        'ok'         => true,
+        'respuesta'  => $textoFinal,
+        'datos'      => $datos,   // null si el agente solo preguntó el plan
+        'guardrails' => $guardrailsActivos,   // defensas activadas en esta petición
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
 } catch (Throwable $e) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $e->getMessage()],
+    // #17 · Manejo de errores amigable: el detalle técnico va al log del servidor,
+    // NUNCA al paciente. Según el origen del fallo mostramos un mensaje claro.
+    error_log('[chat.php] ' . get_class($e) . ': ' . $e->getMessage());
+
+    if ($e instanceof GroqException) {
+        $codigo  = 503;
+        $amigable = 'La asistente de IA no está disponible en este momento. Intenta de nuevo en unos segundos.';
+    } elseif ($e instanceof PDOException) {
+        $codigo  = 503;
+        $amigable = 'No pudimos conectar con la base de datos. Intenta de nuevo en un momento.';
+    } elseif ($e instanceof RuntimeException) {
+        // Errores de validación esperados (mensaje vacío, plan no elegido, etc.):
+        // su mensaje ya es apto para el usuario.
+        $codigo  = 400;
+        $amigable = $e->getMessage();
+    } else {
+        $codigo  = 500;
+        $amigable = 'Ocurrió un problema inesperado. Intenta de nuevo.';
+    }
+
+    http_response_code($codigo);
+    echo json_encode(['ok' => false, 'error' => $amigable],
         JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 }
 
 // =====================================================================
 //  Ejecuta la herramienta. AQUÍ la plata sale del SQL, no del modelo.
 // =====================================================================
-function buscarCopago(PDO $db, string $especialidad, string $planEtiqueta, array $planes, string $ciudad = 'Guayaquil'): array {
+function buscarCopago(PDO $db, string $especialidad, string $planEtiqueta, array $planes, string $ciudad = 'Guayaquil', array $catalogoEsp = []): array {
+    // G2 · Guardrail anti-alucinación de especialidad: si el modelo propone una
+    // especialidad que NO existe en la lista blanca de la BD, se rechaza AQUÍ,
+    // antes de tocar el SQL. Si difiere solo en acentos/mayúsculas, se canonaliza.
+    if ($catalogoEsp) {
+        $canon = gr_validar_especialidad($especialidad, $catalogoEsp);
+        if ($canon === null) {
+            return [
+                'error'                 => 'La especialidad "' . $especialidad . '" no existe en la red. El modelo no puede inventar especialidades.',
+                'especialidad_invalida' => true,
+                'cubierto'              => false,
+                'recomendado'           => null,
+                'opciones'              => [],
+            ];
+        }
+        $especialidad = $canon;   // usar siempre el nombre canónico de la BD
+    }
+
     // Resolver plan_id desde la etiqueta "Aseguradora - Plan"
     $plan_id = null;
     foreach ($planes as $p) {
@@ -314,6 +544,7 @@ function buscarCopago(PDO $db, string $especialidad, string $planEtiqueta, array
     unset($h);
 
     return [
+        'tipo'                  => 'estimacion',
         'especialidad'          => $especialidad,
         'plan'                  => $planEtiqueta,
         'ciudad'                => $ciudad,
@@ -323,4 +554,119 @@ function buscarCopago(PDO $db, string $especialidad, string $planEtiqueta, array
         'recomendado'           => $hospitales[0] ?? null,
         'opciones'              => $hospitales,
     ];
+}
+
+// =====================================================================
+//  comparar_planes  ·  ¿Qué plan conviene contratar?
+//  Para una especialidad y ciudad, recorre TODOS los planes y calcula el mejor
+//  (más barato) copago de cada uno. Los ordena de menor a mayor. La plata sale
+//  del SQL. Ayuda al paciente a decidir qué seguro comprar.
+// =====================================================================
+function compararPlanes(PDO $db, string $especialidad, string $ciudad, array $catalogoEsp = []): array {
+    // G2 · misma validación anti-alucinación de especialidad.
+    if ($catalogoEsp) {
+        $canon = gr_validar_especialidad($especialidad, $catalogoEsp);
+        if ($canon === null) {
+            return [
+                'tipo'                  => 'comparacion_planes',
+                'error'                 => 'La especialidad "' . $especialidad . '" no existe en la red.',
+                'especialidad_invalida' => true,
+                'planes'                => [],
+            ];
+        }
+        $especialidad = $canon;
+    }
+
+    $stmt = $db->prepare("SELECT id, costo_referencia FROM especialidades WHERE nombre = ?");
+    $stmt->execute([$especialidad]);
+    $esp = $stmt->fetch();
+    if (!$esp) {
+        return ['tipo' => 'comparacion_planes', 'error' => 'Especialidad no encontrada.', 'planes' => []];
+    }
+
+    // Mejor copago por plan en esa ciudad y especialidad (más barato disponible).
+    $sql = "SELECT p.aseguradora, p.nombre, p.deducible, p.porcentaje,
+                   MIN(c.copago) AS mejor_copago
+            FROM planes p
+            JOIN coberturas c  ON c.plan_id = p.id
+            JOIN hospitales h  ON h.id = c.hospital_id
+            WHERE c.especialidad_id = ? AND h.ciudad = ?
+            GROUP BY p.id, p.aseguradora, p.nombre, p.deducible, p.porcentaje
+            ORDER BY mejor_copago ASC";
+    $stmt = $db->prepare($sql);
+    $stmt->execute([(int) $esp['id'], $ciudad]);
+    $filas = $stmt->fetchAll();
+
+    $planes = array_map(fn($f) => [
+        'plan'         => $f['aseguradora'] . ' - ' . $f['nombre'],
+        'aseguradora'  => $f['aseguradora'],
+        'porcentaje'   => (int) $f['porcentaje'],
+        'deducible'    => (float) $f['deducible'],
+        'mejor_copago' => (float) $f['mejor_copago'],
+    ], $filas);
+
+    return [
+        'tipo'             => 'comparacion_planes',
+        'especialidad'     => $especialidad,
+        'ciudad'           => $ciudad,
+        'costo_referencia' => (float) $esp['costo_referencia'],
+        'planes'           => $planes,
+        'recomendado'      => $planes[0] ?? null,   // el de copago más bajo
+    ];
+}
+
+// =====================================================================
+//  explicar_cobertura  ·  Transparencia: de dónde sale el copago.
+//  Devuelve los parámetros reales de la póliza (deducible, % de cobertura) y,
+//  si se indica una especialidad, un ejemplo numérico del cálculo. La plata
+//  sale del SQL: el modelo solo redacta la explicación en palabras.
+// =====================================================================
+function explicarCobertura(PDO $db, string $planEtiqueta, array $planes, ?string $especialidad = null, array $catalogoEsp = []): array {
+    // Resolver el plan del paciente por su etiqueta "Aseguradora - Plan".
+    $plan_id = null;
+    foreach ($planes as $p) {
+        if (($p['aseguradora'] . ' - ' . $p['nombre']) === $planEtiqueta) {
+            $plan_id = (int) $p['id'];
+            break;
+        }
+    }
+    if (!$plan_id) {
+        return ['tipo' => 'explicacion_cobertura', 'error' => 'No se encontró el plan del paciente.'];
+    }
+
+    $stmt = $db->prepare("SELECT aseguradora, nombre, deducible, factor_copago, porcentaje
+                          FROM planes WHERE id = ?");
+    $stmt->execute([$plan_id]);
+    $plan = $stmt->fetch();
+
+    $out = [
+        'tipo'          => 'explicacion_cobertura',
+        'plan'          => $planEtiqueta,
+        'aseguradora'   => $plan['aseguradora'],
+        'deducible'     => (float) $plan['deducible'],
+        'factor_copago' => (float) $plan['factor_copago'],
+        'porcentaje'    => (int) $plan['porcentaje'],
+    ];
+
+    // Ejemplo concreto si el paciente mencionó una especialidad.
+    if ($especialidad) {
+        $canon = $catalogoEsp ? gr_validar_especialidad($especialidad, $catalogoEsp) : $especialidad;
+        if ($canon) {
+            $stmt = $db->prepare("SELECT costo_referencia FROM especialidades WHERE nombre = ?");
+            $stmt->execute([$canon]);
+            $esp = $stmt->fetch();
+            if ($esp) {
+                $tarifa = (float) $esp['costo_referencia'];
+                $cubre  = round($tarifa * ((int) $plan['porcentaje']) / 100, 2);
+                $out['especialidad'] = $canon;
+                $out['ejemplo'] = [
+                    'tarifa'        => $tarifa,
+                    'cubre_seguro'  => $cubre,
+                    'base_paciente' => round($tarifa - $cubre, 2),
+                ];
+            }
+        }
+    }
+
+    return $out;
 }

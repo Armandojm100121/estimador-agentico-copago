@@ -51,16 +51,18 @@ $money = fn($n) => '$' . number_format((float)$n, 2);
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@0,400;0,500;0,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="brand.css">
+<script>(function(){try{var t=localStorage.getItem('tema');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:#e9e6dd;font-family:'IBM Plex Sans',sans-serif;color:#10231f;min-height:100vh;padding:24px 16px}
-  a{color:#0f5c5c;text-decoration:none}
+  body{background:var(--bg);font-family:'IBM Plex Sans',sans-serif;color:var(--text);min-height:100vh;padding:24px 16px}
+  a{color:var(--marca);text-decoration:none}
   .sora{font-family:'Sora',sans-serif}
   .wrap{max-width:900px;margin:0 auto}
-  .card{background:#fff;border:1px solid #e6e6e2;border-radius:18px;padding:22px 24px}
-  .chip{display:inline-block;font-size:11.5px;background:#eef1ee;color:#334741;padding:4px 10px;border-radius:8px;font-weight:500}
-  .btn-ghost{background:#fff;border:1px solid #d8ddd8;color:#334741;font-size:13.5px;font-weight:500;padding:10px 16px;border-radius:11px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
-  .btn-ghost:hover{border-color:#0f5c5c;color:#0f5c5c}
+  .card{background:var(--surface);border:1px solid var(--borde);border-radius:18px;padding:22px 24px;color:var(--text)}
+  .chip{display:inline-block;font-size:11.5px;background:var(--surface-2);color:var(--muted);padding:4px 10px;border-radius:8px;font-weight:500}
+  .btn-ghost{background:var(--surface);border:1px solid var(--field-border);color:var(--text);font-size:13.5px;font-weight:500;padding:10px 16px;border-radius:11px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  .btn-ghost:hover{border-color:var(--marca);color:var(--marca)}
   .badge-auth{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:8px}
   @media(max-width:560px){body{padding:14px 10px}.card{padding:18px}}
 </style>
@@ -133,5 +135,6 @@ $money = fn($n) => '$' . number_format((float)$n, 2);
   <?php endif; ?>
 
 </div>
+<script src="theme.js"></script>
 </body>
 </html>

@@ -2,12 +2,18 @@
 // llm.php  -  Llamada a la API de Groq (formato compatible con OpenAI Chat Completions)
 require_once __DIR__ . '/config.php';
 
-function openaiChat(array $messages, array $tools = [], $toolChoice = 'auto'): array {
+// Excepción propia para fallos del modelo (Groq). Permite que chat.php distinga
+// "la IA falló" de "la base de datos falló" y muestre un mensaje amigable acorde (#17).
+class GroqException extends RuntimeException {}
+
+function openaiChat(array $messages, array $tools = [], $toolChoice = 'auto', ?string $model = null): array {
     if (!OPENAI_API_KEY) {
         throw new RuntimeException('Falta la API key. Edita config.local.php.');
     }
 
-    $payload = ['model' => OPENAI_MODEL, 'messages' => $messages];
+    // $model permite sobrescribir el modelo por defecto. Lo usa la evaluación del
+    // agente (#8) para comparar varios modelos de Groq con exactamente el mismo código.
+    $payload = ['model' => $model ?: OPENAI_MODEL, 'messages' => $messages];
     if ($tools) {
         $payload['tools'] = $tools;
         $payload['tool_choice'] = $toolChoice;
@@ -31,12 +37,12 @@ function openaiChat(array $messages, array $tools = [], $toolChoice = 'auto'): a
     curl_close($ch);
 
     if ($err) {
-        throw new RuntimeException("Error de conexión con Groq: $err");
+        throw new GroqException("Error de conexión con Groq: $err");
     }
     $data = json_decode($res, true);
     if ($code !== 200) {
         $msg = $data['error']['message'] ?? $res;
-        throw new RuntimeException("Groq respondió $code: $msg");
+        throw new GroqException("Groq respondió $code: $msg");
     }
     return $data;
 }

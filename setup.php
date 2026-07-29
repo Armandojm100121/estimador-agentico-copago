@@ -99,6 +99,56 @@ try {
                WHERE `nombre` IN ('Cardiología','Traumatología','Ginecología')");
     $add(true, "Reglas de autorización aplicadas");
 
+    // 3b) Columna es_admin en usuarios + designar administradores (panel #9/#10)
+    $existeAdm = (int) $db->query(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'usuarios'
+           AND COLUMN_NAME = 'es_admin'"
+    )->fetchColumn();
+    if ($existeAdm === 0) {
+        $db->exec("ALTER TABLE `usuarios` ADD COLUMN `es_admin` TINYINT(1) NOT NULL DEFAULT 0");
+        $add(true, "Columna 'es_admin' agregada");
+    } else {
+        $add(true, "Columna 'es_admin' ya existía");
+    }
+    // Cuentas con acceso de administrador (edítalas según tu despliegue).
+    $admins = ['maria@correo.com', 'steven23matute@gmail.com'];
+    $ph = implode(',', array_fill(0, count($admins), '?'));
+    $db->prepare("UPDATE `usuarios` SET `es_admin` = 1 WHERE `email` IN ($ph)")->execute($admins);
+    $add(true, "Administradores designados: " . implode(', ', $admins));
+
+    // 3c) Columna email_verificado en usuarios (verificación de correo #15)
+    $existeVer = (int) $db->query(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'usuarios'
+           AND COLUMN_NAME = 'email_verificado'"
+    )->fetchColumn();
+    if ($existeVer === 0) {
+        $db->exec("ALTER TABLE `usuarios` ADD COLUMN `email_verificado` TINYINT(1) NOT NULL DEFAULT 0");
+        $add(true, "Columna 'email_verificado' agregada");
+    } else {
+        $add(true, "Columna 'email_verificado' ya existía");
+    }
+
+    // 3d) Tabla de tokens de correo: sirve para recuperación ('reset') y
+    //     verificación ('verify'). El token viaja en el enlace; en la BD se
+    //     guarda solo su hash SHA-256 (si alguien ve la tabla, no puede usarlo).
+    $db->exec("CREATE TABLE IF NOT EXISTS `tokens_correo` (
+        `id` INT NOT NULL AUTO_INCREMENT,
+        `usuario_id` INT NOT NULL,
+        `token_hash` CHAR(64) NOT NULL,
+        `tipo` VARCHAR(10) NOT NULL DEFAULT 'reset',
+        `expira` DATETIME NOT NULL,
+        `usado` TINYINT(1) NOT NULL DEFAULT 0,
+        `creado_en` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (`id`),
+        KEY `token_hash` (`token_hash`),
+        KEY `usuario_id` (`usuario_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+    $add(true, "Tabla 'tokens_correo' lista");
+
     // 4) Usuario de prueba (solo si no existe)
     $st = $db->prepare("SELECT id FROM usuarios WHERE email = ?");
     $st->execute(['maria@correo.com']);

@@ -2,10 +2,12 @@
 // login.php  -  Inicio de sesión y registro reales, validados contra la BD.
 require __DIR__ . '/auth.php';
 require __DIR__ . '/db.php';
+require __DIR__ . '/tokens.php';
+require __DIR__ . '/mailer.php';
 
-// Si ya está logueado, directo al estimador.
+// Si ya está logueado: el admin va a su panel; el paciente, al estimador.
 if (estaLogueado()) {
-    header('Location: index.php');
+    header('Location: ' . (esAdmin() ? 'metricas.php' : 'index.php'));
     exit;
 }
 
@@ -67,6 +69,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
             $p = $stmt->fetch();
             $etiqueta = $p ? ($p['aseguradora'] . ' - ' . $p['nombre']) : '';
 
+            // Verificación de correo (#15, Nivel 2): genera token 'verify' y
+            // envía el enlace de confirmación. Modo "suave": el usuario puede
+            // entrar igual; solo verá un aviso hasta que confirme su correo.
+            try {
+                $tokenVer = crear_token($db, $nuevoId, 'verify', 60 * 24);   // 24 h
+                $enlaceVer = base_url() . '/verificar.php?token=' . $tokenVer;
+                $htmlVer = correo_plantilla(
+                    'Confirma tu correo',
+                    '<p>Hola ' . htmlspecialchars($nombre, ENT_QUOTES) . ',</p>'
+                    . '<p>Gracias por registrarte. Confirma tu correo para activar todas las funciones de tu cuenta.</p>'
+                    . '<p style="text-align:center">' . correo_boton('Confirmar mi correo', $enlaceVer) . '</p>'
+                    . '<p style="font-size:13px;color:#7a8681">Si el botón no funciona, copia este enlace:<br>'
+                    . '<a href="' . htmlspecialchars($enlaceVer, ENT_QUOTES) . '">' . htmlspecialchars($enlaceVer, ENT_QUOTES) . '</a></p>'
+                );
+                $resVer = enviar_correo($email, 'Confirma tu correo · Estimador Copago', $htmlVer);
+                // Modo demo (sin correo configurado): mostramos el enlace en el estimador.
+                if (!$resVer['ok'] && $resVer['error'] === 'no_config') {
+                    $_SESSION['verify_demo_link'] = $enlaceVer;
+                }
+            } catch (Throwable $e) {
+                error_log('Fallo envío verificación: ' . $e->getMessage());
+            }
+
             iniciarSesionUsuario([
                 'id' => $nuevoId, 'nombre' => $nombre, 'email' => $email,
                 'plan_id' => $planId, 'plan_etiqueta' => $etiqueta,
@@ -103,7 +128,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$error) {
                 'id' => $u['id'], 'nombre' => $u['nombre'], 'email' => $u['email'],
                 'plan_id' => $u['plan_id'], 'plan_etiqueta' => $etiqueta,
             ]);
-            header('Location: index.php');
+            // El admin entra a su panel; el paciente, al estimador.
+            header('Location: ' . (esAdmin() ? 'metricas.php' : 'index.php'));
             exit;
         }
     } catch (Throwable $e) {
@@ -122,23 +148,25 @@ $h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="brand.css">
+<script>(function(){try{var t=localStorage.getItem('tema');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:#e9e6dd;font-family:'IBM Plex Sans',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-  a{color:#0f5c5c;text-decoration:none;cursor:pointer}
-  a:hover{color:#2fbf71}
+  body{background:var(--bg);font-family:'IBM Plex Sans',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  a{color:var(--marca);text-decoration:none;cursor:pointer}
+  a:hover{color:var(--acento)}
   input,select{font-family:'IBM Plex Sans',sans-serif}
   input::placeholder{color:#9aa8a2}
   .sora{font-family:'Sora',sans-serif}
-  .shell{width:1080px;max-width:100%;background:#fff;border-radius:28px;overflow:hidden;box-shadow:0 30px 70px -40px rgba(16,35,31,.45);display:grid;grid-template-columns:1fr 1fr;min-height:640px}
-  .field{width:100%;border:1px solid #d8ddd8;background:#f8faf8;border-radius:12px;padding:13px 15px;font-size:14px;color:#10231f;outline:none;transition:border-color .15s,background .15s}
-  .field:focus{border-color:#0f5c5c;background:#fff}
-  .btn-primary{width:100%;background:#0f5c5c;border:none;color:#fff;font-family:'Sora',sans-serif;font-weight:600;font-size:15px;padding:14px;border-radius:12px;cursor:pointer;transition:background .15s}
-  .btn-primary:hover{background:#12786b}
-  .lbl{font-size:12.5px;font-weight:600;color:#334741;display:block;margin-bottom:7px}
+  .shell{width:1080px;max-width:100%;background:var(--surface);border-radius:28px;overflow:hidden;box-shadow:0 30px 70px -40px rgba(16,35,31,.45);display:grid;grid-template-columns:1fr 1fr;min-height:640px}
+  .field{width:100%;border:1px solid var(--field-border);background:var(--surface-2);border-radius:12px;padding:13px 15px;font-size:14px;color:var(--text);outline:none;transition:border-color .15s,background .15s}
+  .field:focus{border-color:var(--marca);background:var(--surface)}
+  .btn-primary{width:100%;background:var(--marca);border:none;color:#fff;font-family:'Sora',sans-serif;font-weight:600;font-size:15px;padding:14px;border-radius:12px;cursor:pointer;transition:background .15s}
+  .btn-primary:hover{background:var(--marca-2)}
+  .lbl{font-size:12.5px;font-weight:600;color:var(--text);display:block;margin-bottom:7px}
   .err{background:#fdeaea;border:1px solid #f3c6c6;color:#b23c3c;font-size:13.5px;padding:11px 14px;border-radius:11px;margin-bottom:16px;line-height:1.5}
   .hidden{display:none}
-  .formside{padding:48px 52px;display:flex;flex-direction:column;justify-content:center;background:#fff}
+  .formside{padding:48px 52px;display:flex;flex-direction:column;justify-content:center;background:var(--surface)}
   @media(max-width:860px){.shell{grid-template-columns:1fr;min-height:auto}.brand-side{display:none}}
   @media(max-width:560px){body{padding:14px}.shell{border-radius:20px}.formside{padding:34px 24px}}
 </style>
@@ -183,7 +211,7 @@ $h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
             <input class="field" type="email" name="email" placeholder="tucorreo@ejemplo.com" value="<?= $h($emailOld) ?>" required>
           </div>
           <div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px"><label class="lbl" style="margin:0">Contraseña</label></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px"><label class="lbl" style="margin:0">Contraseña</label><a href="forgot.php" style="font-size:12.5px;font-weight:500">¿Olvidaste tu contraseña?</a></div>
             <input class="field" type="password" name="password" placeholder="••••••••" required>
           </div>
           <button class="btn-primary" type="submit" style="margin-top:6px">Entrar</button>
@@ -235,5 +263,6 @@ $h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
     document.getElementById('panel-registro').classList.toggle('hidden', cual !== 'registro');
   }
 </script>
+<script src="theme.js"></script>
 </body>
 </html>

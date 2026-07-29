@@ -1,10 +1,14 @@
 # Claves y secretos locales - NUNCA subir a Git
 config.local.php
 db.local.php
+mail.local.php
 .env
 
 # Dependencias
 /vendor/
+
+# Registro de guardrails (se regenera en tiempo de ejecución)
+guardrails.log
 
 # Sistema
 .DS_Store

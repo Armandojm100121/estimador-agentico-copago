@@ -33,6 +33,32 @@ function requiereLogin(): void {
     }
 }
 
+/** ¿El usuario logueado es administrador? (consulta la BD; refleja cambios al instante) */
+function esAdmin(): bool {
+    if (!estaLogueado()) {
+        return false;
+    }
+    if (!function_exists('getDB')) {
+        require_once __DIR__ . '/db.php';
+    }
+    try {
+        $st = getDB()->prepare("SELECT es_admin FROM usuarios WHERE id = ?");
+        $st->execute([$_SESSION['user_id']]);
+        return (bool) $st->fetchColumn();
+    } catch (Throwable $e) {
+        return false;   // si la columna aún no existe, nadie es admin
+    }
+}
+
+/** Bloquea el acceso si el usuario no es administrador. Para páginas de gestión. */
+function requiereAdmin(): void {
+    requiereLogin();
+    if (!esAdmin()) {
+        http_response_code(403);
+        exit('Acceso restringido: solo administradores.');
+    }
+}
+
 /**
  * Deja la sesión lista para un usuario recién autenticado.
  * Guarda también el plan en las claves que espera chat.php
