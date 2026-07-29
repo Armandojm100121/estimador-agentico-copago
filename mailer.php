@@ -13,9 +13,12 @@
 
 require_once __DIR__ . '/config.php';
 
-/** ¿Está configurado el envío real de correo? */
+/** ¿Está configurado el envío real de correo? (por Brevo HTTP o por SMTP de Gmail) */
 function mail_configurado(): bool
 {
+    if (BREVO_API_KEY !== '' && MAIL_FROM !== '') {
+        return true;
+    }
     return GMAIL_USER !== '' && GMAIL_APP_PASSWORD !== '';
 }
 
@@ -36,16 +39,69 @@ function base_url(): string
 }
 
 /**
- * Envía un correo HTML por SMTP de Gmail.
- * Devuelve ['ok' => bool, 'error' => string|null].
- * Si no hay credenciales, devuelve ok=false y error='no_config' (modo demo).
+ * Envía un correo HTML. Elige el transporte disponible:
+ *   1) Brevo (API HTTP)  -> funciona en Railway (no usa puertos SMTP bloqueados).
+ *   2) SMTP de Gmail     -> respaldo para local (Railway bloquea el 465).
+ * Devuelve ['ok' => bool, 'error' => string|null]. Si no hay nada configurado,
+ * devuelve error='no_config' (modo demo: el llamador muestra el enlace en pantalla).
  */
 function enviar_correo(string $para, string $asunto, string $html): array
 {
-    if (!mail_configurado()) {
-        return ['ok' => false, 'error' => 'no_config'];
+    if (BREVO_API_KEY !== '' && MAIL_FROM !== '') {
+        return enviar_por_brevo($para, $asunto, $html);
     }
+    if (GMAIL_USER !== '' && GMAIL_APP_PASSWORD !== '') {
+        return enviar_por_smtp($para, $asunto, $html);
+    }
+    return ['ok' => false, 'error' => 'no_config'];
+}
 
+/**
+ * Envío por la API HTTP de Brevo (https://api.brevo.com). Usa HTTPS (443),
+ * por eso funciona en Railway. El remitente MAIL_FROM debe estar verificado en Brevo.
+ */
+function enviar_por_brevo(string $para, string $asunto, string $html): array
+{
+    $payload = [
+        'sender'      => ['name' => MAIL_FROM_NAME, 'email' => MAIL_FROM],
+        'to'          => [['email' => $para]],
+        'subject'     => $asunto,
+        'htmlContent' => $html,
+    ];
+    $ch = curl_init('https://api.brevo.com/v3/smtp/email');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_HTTPHEADER     => [
+            'accept: application/json',
+            'content-type: application/json',
+            'api-key: ' . BREVO_API_KEY,
+        ],
+        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+        CURLOPT_TIMEOUT    => 20,
+    ]);
+    $res  = curl_exec($ch);
+    $err  = curl_error($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($err) {
+        return ['ok' => false, 'error' => "Error de conexión con Brevo: $err"];
+    }
+    if ($code === 201 || $code === 200) {
+        return ['ok' => true, 'error' => null];
+    }
+    $data = json_decode($res, true);
+    $msg  = $data['message'] ?? $res;
+    return ['ok' => false, 'error' => "Brevo respondió $code: $msg"];
+}
+
+/**
+ * Envía un correo HTML por SMTP de Gmail (respaldo local; Railway bloquea el 465).
+ * Devuelve ['ok' => bool, 'error' => string|null].
+ */
+function enviar_por_smtp(string $para, string $asunto, string $html): array
+{
     $host = 'smtp.gmail.com';
     $port = 465;
     $user = GMAIL_USER;

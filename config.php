@@ -21,17 +21,25 @@ define('OPENAI_MODEL', 'llama-3.3-70b-versatile');     // modelo de Groq con sop
 // sino que muestra el enlace en pantalla (útil para desarrollar sin internet).
 // GMAIL_APP_PASSWORD es una "contraseña de aplicación" de Google, NO la normal.
 // ---------------------------------------------------------------------------
-$mailUser = getenv('GMAIL_USER') ?: '';
-$mailPass = getenv('GMAIL_APP_PASSWORD') ?: '';
-if ((!$mailUser || !$mailPass) && file_exists(__DIR__ . '/mail.local.php')) {
+$mailUser  = getenv('GMAIL_USER') ?: '';
+$mailPass  = getenv('GMAIL_APP_PASSWORD') ?: '';
+$brevoKey  = getenv('BREVO_API_KEY') ?: '';
+$mailFrom  = getenv('MAIL_FROM') ?: '';
+if (file_exists(__DIR__ . '/mail.local.php')) {
     $ml = require __DIR__ . '/mail.local.php';
     if (is_array($ml)) {
-        $mailUser = $mailUser ?: ($ml['user'] ?? '');
-        $mailPass = $mailPass ?: ($ml['pass'] ?? '');
+        $mailUser = $mailUser ?: ($ml['user']      ?? '');
+        $mailPass = $mailPass ?: ($ml['pass']      ?? '');
+        $brevoKey = $brevoKey ?: ($ml['brevo_key'] ?? '');
+        $mailFrom = $mailFrom ?: ($ml['from']      ?? '');
     }
 }
 define('GMAIL_USER', $mailUser);
 define('GMAIL_APP_PASSWORD', $mailPass);
+// Brevo (API HTTP) — funciona en Railway porque NO usa puertos SMTP bloqueados.
+define('BREVO_API_KEY', $brevoKey);
+// Correo remitente (debe estar verificado en Brevo). Por defecto usa el de Gmail.
+define('MAIL_FROM', $mailFrom ?: $mailUser);
 define('MAIL_FROM_NAME', getenv('MAIL_FROM_NAME') ?: 'Estimador Copago');
 // URL base del sitio para armar los enlaces de los correos (opcional; si está
 // vacía se deduce del request). En Railway conviene fijarla, ej: https://tuapp.up.railway.app

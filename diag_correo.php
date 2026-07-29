@@ -16,10 +16,11 @@ echo "=== DIAGNOSTICO DE CORREO ===\n\n";
 
 // 1) Configuración
 echo "1) Configuracion\n";
-echo "   mail_configurado(): " . (mail_configurado() ? 'SI' : 'NO (faltan GMAIL_USER/GMAIL_APP_PASSWORD)') . "\n";
-echo "   GMAIL_USER        : [" . GMAIL_USER . "]\n";
-echo "   APP_PASSWORD len  : " . strlen(GMAIL_APP_PASSWORD) . " caracteres (debe ser 16)\n";
+echo "   mail_configurado(): " . (mail_configurado() ? 'SI' : 'NO') . "\n";
+echo "   BREVO_API_KEY     : " . (BREVO_API_KEY !== '' ? ('configurada (' . strlen(BREVO_API_KEY) . ' chars)') : 'NO configurada') . "\n";
+echo "   MAIL_FROM         : [" . MAIL_FROM . "]  (debe estar VERIFICADO en Brevo)\n";
 echo "   MAIL_FROM_NAME    : [" . MAIL_FROM_NAME . "]\n";
+echo "   GMAIL_USER        : [" . GMAIL_USER . "]  (solo respaldo SMTP local)\n";
 echo "   APP_URL           : [" . APP_URL . "]\n";
 echo "   base_url()        : [" . base_url() . "]\n\n";
 
