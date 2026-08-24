@@ -113,10 +113,14 @@ try {
         $add(true, "Columna 'es_admin' ya existía");
     }
     // Cuentas con acceso de administrador (edítalas según tu despliegue).
-    $admins = ['maria@correo.com', 'steven23matute@gmail.com'];
+    // Esta lista es la ÚNICA fuente de verdad: primero se quita el rol admin a
+    // TODOS y luego se otorga solo a estos correos. Así, cualquier cuenta que no
+    // esté aquí queda como usuario normal aunque antes hubiera sido admin.
+    $admins = ['maria@correo.com'];
     $ph = implode(',', array_fill(0, count($admins), '?'));
-    $db->prepare("UPDATE `usuarios` SET `es_admin` = 1 WHERE `email` IN ($ph)")->execute($admins);
-    $add(true, "Administradores designados: " . implode(', ', $admins));
+    $db->exec("UPDATE `usuarios` SET `es_admin` = 0");                              // quita admin a todos
+    $db->prepare("UPDATE `usuarios` SET `es_admin` = 1 WHERE `email` IN ($ph)")->execute($admins);  // lo da solo a la lista
+    $add(true, "Administradores designados (solo estos): " . implode(', ', $admins));
 
     // 3c) Columna email_verificado en usuarios (verificación de correo #15)
     $existeVer = (int) $db->query(
