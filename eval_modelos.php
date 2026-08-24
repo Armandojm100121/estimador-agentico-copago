@@ -6,6 +6,6 @@
 // El primero de la lista es el que usa la app en producción (config.php).
 
 return [
-    'llama-3.3-70b-versatile' => ['label' => 'Llama 3.3 70B (versatile)', 'in' => 0.59, 'out' => 0.79],
-    'llama-3.1-8b-instant'    => ['label' => 'Llama 3.1 8B (instant)',    'in' => 0.05, 'out' => 0.08],
+    'openai/gpt-oss-120b' => ['label' => 'GPT-OSS 120B (grande)',  'in' => 0.15, 'out' => 0.60],
+    'openai/gpt-oss-20b'  => ['label' => 'GPT-OSS 20B (rapido)',   'in' => 0.10, 'out' => 0.50],
 ];

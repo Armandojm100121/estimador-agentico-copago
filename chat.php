@@ -305,6 +305,10 @@ try {
     //                  y el paciente nunca vea un error crudo.
     try {
         $resp = openaiChat($_SESSION['messages'], $toolsArg, $choiceArg);
+    } catch (GroqRateLimitException $e) {
+        // Límite por minuto: reintentar gastaría MÁS tokens y empeoraría. Propaga
+        // directo para avisar al paciente que espere unos segundos.
+        throw $e;
     } catch (Throwable $e) {
         try {
             if ($choiceArg !== 'auto') {
@@ -312,6 +316,8 @@ try {
             } else {
                 throw $e;
             }
+        } catch (GroqRateLimitException $e2) {
+            throw $e2;
         } catch (Throwable $e2) {
             // Último recurso: sin herramientas. El modelo no podrá calcular el copago
             // en este turno, pero mantiene la conversación viva sin romperse.
@@ -465,7 +471,13 @@ try {
     // NUNCA al paciente. Según el origen del fallo mostramos un mensaje claro.
     error_log('[chat.php] ' . get_class($e) . ': ' . $e->getMessage());
 
-    if ($e instanceof GroqException) {
+    if ($e instanceof GroqRateLimitException) {
+        // Límite gratis de Groq (tokens por minuto). Mensaje claro, no alarmante.
+        $codigo  = 429;
+        $seg     = $e->esperaSegundos > 0 ? (int) ceil($e->esperaSegundos) : 20;
+        $amigable = 'Estoy recibiendo muchas consultas seguidas y el plan gratis de la IA '
+                  . 'tiene un límite por minuto. Espera ~' . $seg . ' segundos y vuelve a intentar. 🙏';
+    } elseif ($e instanceof GroqException) {
         $codigo  = 503;
         $amigable = 'La asistente de IA no está disponible en este momento. Intenta de nuevo en unos segundos.';
     } elseif ($e instanceof PDOException) {

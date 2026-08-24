@@ -166,6 +166,15 @@ $h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
   .lbl{font-size:12.5px;font-weight:600;color:var(--text);display:block;margin-bottom:7px}
   .err{background:#fdeaea;border:1px solid #f3c6c6;color:#b23c3c;font-size:13.5px;padding:11px 14px;border-radius:11px;margin-bottom:16px;line-height:1.5}
   .hidden{display:none}
+  .pwd-wrap{position:relative}
+  .pwd-wrap .field{padding-right:44px}
+  .pwd-eye{position:absolute;top:50%;right:8px;transform:translateY(-50%);width:30px;height:30px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#9aa8a2;border-radius:8px;padding:0}
+  .pwd-eye:hover{color:var(--marca)}
+  .pwd-eye:focus-visible{outline:2px solid var(--marca);outline-offset:2px}
+  .pwd-eye svg{width:19px;height:19px;display:block}
+  .pwd-eye .eye-off{display:none}
+  .pwd-eye.on .eye-open{display:none}
+  .pwd-eye.on .eye-off{display:block}
   .formside{padding:48px 52px;display:flex;flex-direction:column;justify-content:center;background:var(--surface)}
   @media(max-width:860px){.shell{grid-template-columns:1fr;min-height:auto}.brand-side{display:none}}
   @media(max-width:560px){body{padding:14px}.shell{border-radius:20px}.formside{padding:34px 24px}}
@@ -212,7 +221,13 @@ $h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
           </div>
           <div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px"><label class="lbl" style="margin:0">Contraseña</label><a href="forgot.php" style="font-size:12.5px;font-weight:500">¿Olvidaste tu contraseña?</a></div>
-            <input class="field" type="password" name="password" placeholder="••••••••" required>
+            <div class="pwd-wrap">
+              <input class="field" type="password" name="password" placeholder="••••••••" required>
+              <button type="button" class="pwd-eye" onclick="togglePwd(this)" aria-label="Mostrar contraseña" title="Mostrar/ocultar contraseña">
+                <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
           </div>
           <button class="btn-primary" type="submit" style="margin-top:6px">Entrar</button>
         </form>
@@ -235,7 +250,13 @@ $h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
           </div>
           <div>
             <label class="lbl">Contraseña <span style="color:#9aa8a2;font-weight:400">(mínimo 6 caracteres)</span></label>
-            <input class="field" type="password" name="password" placeholder="••••••••" required>
+            <div class="pwd-wrap">
+              <input class="field" type="password" name="password" placeholder="••••••••" required>
+              <button type="button" class="pwd-eye" onclick="togglePwd(this)" aria-label="Mostrar contraseña" title="Mostrar/ocultar contraseña">
+                <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              </button>
+            </div>
           </div>
           <div>
             <label class="lbl">Tu plan de seguro</label>
@@ -261,6 +282,13 @@ $h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
   function mostrar(cual){
     document.getElementById('panel-login').classList.toggle('hidden', cual !== 'login');
     document.getElementById('panel-registro').classList.toggle('hidden', cual !== 'registro');
+  }
+  function togglePwd(btn){
+    var inp = btn.parentElement.querySelector('input');
+    var mostrar = inp.type === 'password';
+    inp.type = mostrar ? 'text' : 'password';
+    btn.classList.toggle('on', mostrar);
+    btn.setAttribute('aria-label', mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña');
   }
 </script>
 <script src="theme.js"></script>

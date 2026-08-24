@@ -196,7 +196,7 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
     <?php unset($_SESSION['verify_demo_link']); endif; ?>
 
     <!-- metric row -->
-    <div class="metrics">
+    <div class="metrics" id="resumen" style="scroll-margin-top:16px">
       <div style="background:linear-gradient(135deg,#0f5c5c,#12786b);border-radius:20px;padding:26px;color:#eafaf3;position:relative;overflow:hidden">
         <div style="position:absolute;right:-30px;top:-30px;width:150px;height:150px;background:radial-gradient(circle,#2fbf71 0%,transparent 70%);opacity:.35"></div>
         <div style="display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.15);font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;margin-bottom:16px">✦ Recomendado para ti</div>
@@ -440,7 +440,14 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
     if(d.tipo === 'explicacion_cobertura'){ cardExplicacionCobertura(d); return; }
     // estimacion (buscar_copago o buscar_por_ciudad)
     if(d.ciudad && d.ciudad !== ciudadActual){ cardEstimacionOtraCiudad(d); return; }
-    if(d.recomendado || d.cubierto === false){ pintarResultado(d); }
+    if(d.recomendado || d.cubierto === false){ pintarResultado(d); irAResumen(); }
+  }
+
+  // Sube suavemente a la tarjeta de valores (copago/ahorro/cobertura) cuando la
+  // IA acaba de calcular una estimación, para que el usuario la vea sin scrollear.
+  function irAResumen(){
+    const r = document.getElementById('resumen');
+    if(r) r.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // Inserta una tarjeta clara (para el chat oscuro) como burbuja de ancho completo.
@@ -735,7 +742,8 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
       bubble('⚠️ Sin conexión con el servidor. Revisa que el servidor y la base de datos estén activos.', false);
     }
     quitarSkeletons();           // si no hubo estimación nueva, vuelve al estado vacío
-    busy = false; sendBtn.disabled = false; input.focus();
+    busy = false; sendBtn.disabled = false;
+    input.focus({ preventScroll: true });   // mantiene el foco sin cancelar el scroll a los valores
   }
   function preguntar(txt){ input.value = txt; enviar(); }
 

@@ -10,7 +10,7 @@ if (!$key && file_exists(__DIR__ . '/config.local.php')) {
 }
 
 define('OPENAI_API_KEY', $key ?: '');                  // nombre histórico — guarda la key de Groq
-define('OPENAI_MODEL', 'llama-3.3-70b-versatile');     // modelo de Groq con soporte de tool calling
+define('OPENAI_MODEL', 'openai/gpt-oss-20b');          // modelo de Groq con tool calling; el 20B gasta menos tokens (mejor para el limite gratis). Llama 3.x fue retirado por Groq.
 
 // ---------------------------------------------------------------------------
 // Correo transaccional (recuperación de contraseña / verificación) — #15
