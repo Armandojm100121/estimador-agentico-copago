@@ -6,6 +6,7 @@ $activo = $activo ?? '';
 $adm = function_exists('usuarioActual') ? usuarioActual() : null;
 $navItems = [
     'metricas' => ['Métricas',      'metricas.php', '▤'],
+    'usuarios' => ['Usuarios',      'usuarios.php', '👥'],
     'gestion'  => ['Gestión',       'admin.php',    '⚙'],
     'evaluar'  => ['Evaluación IA',  'evaluar.php',  '◈'],
 ];

@@ -149,6 +149,36 @@ try {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
     $add(true, "Tabla 'tokens_correo' lista");
 
+    // 3e) Llaves foráneas hacia `usuarios` (integridad referencial + diagrama ER completo).
+    //     `consultas` y `tokens_correo` tenían solo un índice sobre usuario_id; aquí lo
+    //     formalizamos como FOREIGN KEY para que la BD garantice que todo registro
+    //     pertenece a un usuario real y se elimine en cascada con él.
+    $agregarFK = function (string $tabla, string $constraint) use ($db, $add) {
+        // ¿Ya existe esta llave foránea? (idempotente: no falla al re-ejecutar)
+        $existe = (int) $db->query(
+            "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = '$tabla'
+               AND CONSTRAINT_NAME = '$constraint'
+               AND CONSTRAINT_TYPE = 'FOREIGN KEY'"
+        )->fetchColumn();
+        if ($existe > 0) {
+            $add(true, "Llave foránea de '$tabla' ya existía");
+            return;
+        }
+        // Limpia filas huérfanas (usuario_id que ya no existe) para que la FK no falle.
+        $db->exec("DELETE FROM `$tabla`
+                   WHERE `usuario_id` IS NOT NULL
+                     AND `usuario_id` NOT IN (SELECT `id` FROM `usuarios`)");
+        $db->exec("ALTER TABLE `$tabla`
+                   ADD CONSTRAINT `$constraint`
+                   FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`)
+                   ON DELETE CASCADE");
+        $add(true, "Llave foránea de '$tabla' → usuarios creada");
+    };
+    $agregarFK('consultas', 'consultas_ibfk_1');
+    $agregarFK('tokens_correo', 'tokens_correo_ibfk_1');
+
     // 4) Usuario de prueba (solo si no existe)
     $st = $db->prepare("SELECT id FROM usuarios WHERE email = ?");
     $st->execute(['maria@correo.com']);
