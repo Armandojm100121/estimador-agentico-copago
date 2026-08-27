@@ -222,6 +222,25 @@ try {
                 ],
             ],
         ],
+        [
+            // Guardrail de ALCANCE: el agente declara que el mensaje NO es de salud
+            // en vez de inventar una especialidad ante sinsentidos o temas ajenos.
+            'type' => 'function',
+            'function' => [
+                'name' => 'fuera_de_tema',
+                'description' => 'Úsala cuando el mensaje del paciente NO trata de una molestia, dolor o síntoma de salud: por ejemplo insultos, texto sin sentido, bromas o temas ajenos a la salud. En esos casos NO inventes una especialidad: llama a esta herramienta.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'motivo' => [
+                            'type' => 'string',
+                            'description' => 'Motivo breve por el que el mensaje no es una consulta de salud (opcional).',
+                        ],
+                    ],
+                    'required' => [],
+                ],
+            ],
+        ],
     ];
 
     // 4) Validar que el paciente eligió su plan en la pantalla de bienvenida
@@ -242,6 +261,13 @@ try {
                 "pagará de copago y qué hospital de su red le conviene más.\n" .
                 "EL PLAN YA ESTÁ IDENTIFICADO: \"$planActual\". NUNCA preguntes por el plan.\n" .
                 "Especialidades disponibles: $listaEsp.\n" .
+                "ALCANCE (MUY IMPORTANTE): solo ayudas con molestias, dolores o síntomas de " .
+                "salud. Si el mensaje del paciente NO trata de salud (insultos, texto sin " .
+                "sentido, bromas o temas ajenos a la salud), NO preguntes ni inventes una " .
+                "especialidad: en un turno con herramientas llama a la herramienta " .
+                "fuera_de_tema; si no tienes herramientas disponibles, responde en UNA frase " .
+                "amable que solo puedes ayudar con síntomas de salud e invítalo a contarte " .
+                "qué siente.\n" .
                 "FLUJO OBLIGATORIO (síguelo al pie de la letra):\n" .
                 "1) PRIMER mensaje del paciente con un síntoma: NO llames la herramienta NUNCA en este " .
                 "turno, aunque el síntoma te parezca clarísimo. Responde con una frase corta de empatía " .
@@ -250,7 +276,8 @@ try {
                 "2) SEGUNDO mensaje (el paciente ya respondió tu pregunta): NO hagas más preguntas. " .
                 "Deduce la especialidad y llama INMEDIATAMENTE a la herramienta buscar_copago con esa " .
                 "especialidad (el plan y la ciudad ya los conoce el sistema). Aunque la info sea " .
-                "incompleta, igual llámala.\n" .
+                "incompleta, igual llámala. Excepción: si ese mensaje NO es un síntoma de salud, " .
+                "llama a fuera_de_tema en lugar de buscar_copago.\n" .
                 "3) Al presentar el resultado: UNA frase corta indicando la especialidad sugerida. " .
                 "NO repitas montos ni hospitales en el texto (se muestran en una tarjeta aparte). " .
                 "Si el resultado de la herramienta trae requiere_autorizacion=true, agrega una segunda " .
@@ -290,8 +317,12 @@ try {
         $toolsArg  = [];
         $choiceArg = 'auto';
     } elseif ($userTurns === 2) {
-        $toolsArg  = $tools;
-        $choiceArg = ['type' => 'function', 'function' => ['name' => 'buscar_copago']];
+        // El modelo DEBE elegir una herramienta, pero solo entre estimar (buscar_copago)
+        // o declarar que el mensaje no es de salud (fuera_de_tema). Así no inventa una
+        // especialidad ante mensajes sin sentido o ajenos a la salud.
+        $toolsArg  = array_values(array_filter($tools, fn($t) =>
+            in_array($t['function']['name'], ['buscar_copago', 'fuera_de_tema'], true)));
+        $choiceArg = 'required';
     } else {
         $toolsArg  = $tools;
         $choiceArg = 'auto';
@@ -328,6 +359,7 @@ try {
     $_SESSION['messages'][] = $choice;
 
     $datos = null;
+    $fueraDeTema = false;   // se activa si el paciente escribió algo que no es de salud
 
     // 7) ¿El modelo usó alguna herramienta? El agente decide CUÁL según lo que pidió
     //    el paciente. Aquí despachamos cada llamada al manejador correspondiente.
@@ -365,6 +397,12 @@ try {
                                                    $args['especialidad'] ?? null, $especialidades);
                     break;
 
+                case 'fuera_de_tema':
+                    // El agente detectó que el mensaje no es una consulta de salud.
+                    $resultado    = ['tipo' => 'fuera_de_tema'];
+                    $fueraDeTema  = true;
+                    break;
+
                 case 'buscar_copago':
                 default:
                     $resultado = buscarCopago($db, $args['especialidad'] ?? '', $planSel, $planes,
@@ -391,10 +429,21 @@ try {
                 'content'      => json_encode($resultado, JSON_UNESCAPED_UNICODE),
             ];
         }
-        // 8) Segunda llamada: el modelo redacta la respuesta final con los datos reales
-        $resp2  = openaiChat($_SESSION['messages'], $tools);
-        $choice = $resp2['choices'][0]['message'];
-        $_SESSION['messages'][] = $choice;
+        // 8) Respuesta final.
+        if ($fueraDeTema) {
+            // El mensaje no era de salud: respondemos directo y amable (sin gastar otra
+            // llamada al modelo) y descartamos cualquier "estimación".
+            $choice = ['role' => 'assistant', 'content' =>
+                'Puedo ayudarte solo con molestias o síntomas de salud, para estimar tu copago '
+              . 'y orientarte sobre a qué especialista acudir. Cuéntame qué sientes 🙂'];
+            $_SESSION['messages'][] = $choice;
+            $datos = null;
+        } else {
+            // Segunda llamada: el modelo redacta la respuesta final con los datos reales.
+            $resp2  = openaiChat($_SESSION['messages'], $tools);
+            $choice = $resp2['choices'][0]['message'];
+            $_SESSION['messages'][] = $choice;
+        }
     }
 
     // 7b) FALLBACK robusto: a veces Llama NO usa el campo tool_calls y escribe la llamada

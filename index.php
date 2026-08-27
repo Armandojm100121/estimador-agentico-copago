@@ -129,7 +129,7 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
   #btn-tema{right:20px;left:auto;bottom:20px;z-index:1401}
   /* Botón flotante permanente de Clara (a la izquierda del de tema) */
   #chatFab{position:fixed;right:78px;bottom:20px;z-index:1400;display:inline-flex;align-items:center;gap:9px;
-    background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,0) 46%),linear-gradient(180deg,#2fbf71,#12a266);color:#053023;border:none;border-radius:999px;
+    background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,0) 46%),linear-gradient(135deg,#0f5c5c,#12786b);color:#fff;border:none;border-radius:999px;
     padding:13px 20px 13px 14px;font-family:'Sora',sans-serif;font-weight:700;font-size:14px;cursor:pointer;
     box-shadow:0 18px 40px -16px rgba(15,92,92,.7),inset 0 1px 0 rgba(255,255,255,.35);
     animation:fab-in .5s var(--ease-spring) .25s both;
@@ -138,8 +138,8 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
   #chatFab:hover{transform:translateY(-2px);box-shadow:0 22px 48px -16px rgba(15,92,92,.8),inset 0 1px 0 rgba(255,255,255,.4)}
   #chatFab:active{transform:scale(.97)}
   @keyframes fab-in{from{opacity:0;transform:translateY(12px) scale(.9)}to{opacity:1;transform:none}}
-  @keyframes fab-pulse{0%{box-shadow:0 0 0 0 rgba(47,191,113,.45)}70%{box-shadow:0 0 0 14px rgba(47,191,113,0)}100%{box-shadow:0 0 0 0 rgba(47,191,113,0)}}
-  #chatFab .ic{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-size:15px;position:relative;z-index:3}
+  @keyframes fab-pulse{0%{box-shadow:0 0 0 0 rgba(15,92,92,.45)}70%{box-shadow:0 0 0 14px rgba(15,92,92,0)}100%{box-shadow:0 0 0 0 rgba(15,92,92,0)}}
+  #chatFab .ic{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.92);color:#0f5c5c;display:flex;align-items:center;justify-content:center;font-size:15px;position:relative;z-index:3}
   #chatFab .label{position:relative;z-index:3}
   /* Panel flotante del chat */
   .chat-dock{position:fixed;right:20px;bottom:20px;z-index:1450;
@@ -255,7 +255,7 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
 
     <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px">
       <div style="background:rgba(255,255,255,.06);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);border:1px solid rgba(255,255,255,.10);box-shadow:inset 0 1px 0 rgba(255,255,255,.10);border-radius:14px;padding:13px;display:flex;gap:11px;align-items:center">
-        <div style="width:36px;height:36px;border-radius:50%;background:#2fbf71;color:#053023;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex-shrink:0"><?= $h($ini) ?></div>
+        <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#0f5c5c,#12786b);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex-shrink:0"><?= $h($ini) ?></div>
         <div style="min-width:0"><div style="font-size:13.5px;color:#fff;font-weight:600"><?= $h($u['nombre']) ?></div><div style="font-size:12px;color:#7fa494;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= $h($planTxt) ?></div></div>
       </div>
       <a href="logout.php" style="font-size:12.5px;color:#7fa494;text-align:center;padding:6px">Cerrar sesión</a>
@@ -357,7 +357,7 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
 </button>
 <div id="chatDock" class="chat-dock" role="dialog" aria-label="Chat con Clara">
   <div class="chat-dock-head">
-    <div style="width:32px;height:32px;border-radius:9px;background:#2fbf71;display:flex;align-items:center;justify-content:center;font-size:16px">✦</div>
+    <div style="width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#0f5c5c,#12786b);display:flex;align-items:center;justify-content:center;font-size:16px">✦</div>
     <div><div class="sora" style="font-weight:600;font-size:14px;color:#fff">Clara · Asistente IA</div><div style="font-size:11.5px;color:#7fa494">Te dice tu especialista y tu copago</div></div>
     <button class="x" onclick="cerrarChat()" aria-label="Cerrar chat">×</button>
   </div>
@@ -371,7 +371,7 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
   </div>
   <div class="inrow">
     <input id="chat-input" aria-label="Escribe tu síntoma o molestia" placeholder="Cuéntame cómo te sientes…" style="border:none;outline:none;flex:1;font-size:13.5px;color:#10231f;background:transparent" onkeydown="if(event.key==='Enter')enviar()">
-    <button id="send-btn" onclick="enviar()" aria-label="Enviar mensaje a Clara" style="background:#2fbf71;border:none;width:36px;height:36px;border-radius:10px;color:#053023;font-size:17px;cursor:pointer">↑</button>
+    <button id="send-btn" onclick="enviar()" aria-label="Enviar mensaje a Clara" style="background:linear-gradient(135deg,#0f5c5c,#12786b);border:none;width:36px;height:36px;border-radius:10px;color:#fff;font-size:17px;cursor:pointer">↑</button>
   </div>
 </div>
 
@@ -536,7 +536,7 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
   function bubble(text, mine){
     const b = document.createElement('div');
     b.style.cssText = mine
-      ? 'align-self:flex-end;background:#2fbf71;color:#053023;font-size:13px;line-height:1.5;padding:11px 14px;border-radius:14px 14px 4px 14px;max-width:82%'
+      ? 'align-self:flex-end;background:#12786b;color:#fff;font-size:13px;line-height:1.5;padding:11px 14px;border-radius:14px 14px 4px 14px;max-width:82%'
       : 'align-self:flex-start;background:#1c332d;color:#cfe0d8;font-size:13px;line-height:1.55;padding:11px 14px;border-radius:14px 14px 14px 4px;max-width:88%';
     b.innerHTML = esc(text);
     log.appendChild(b);
@@ -764,7 +764,7 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
     opciones.forEach((o, i) => {
       const pct = maxC > 0 ? Math.max(8, Math.round(Number(o.copago) / maxC * 100)) : 100;
       const esMejor = o.nombre === best.nombre;
-      const color = esMejor ? '#2fbf71' : (i % 2 ? '#c9b39a' : '#9ab4ab');
+      const color = esMejor ? '#12786b' : (i % 2 ? '#c9b39a' : '#9ab4ab');
       const nameColor = esMejor ? '#0f5c5c' : '#334741';
       const badge = esMejor ? ' <span style="font-size:11px;background:#e2f6ec;color:#128a4e;padding:2px 7px;border-radius:6px;font-weight:600;margin-left:4px">Mejor</span>' : '';
       cont.innerHTML +=
