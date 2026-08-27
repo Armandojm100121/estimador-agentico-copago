@@ -11,7 +11,7 @@ $navItems = [
     'evaluar'  => ['Evaluación IA',  'evaluar.php',  '◈'],
 ];
 ?>
-<div style="background:rgba(13,31,27,.72);backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);border:1px solid rgba(255,255,255,.09);border-radius:16px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:12px;z-index:100;box-shadow:0 14px 38px -20px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.10)">
+<div style="background:linear-gradient(180deg,rgba(17,48,40,.86),rgba(11,30,25,.84));backdrop-filter:blur(22px) saturate(1.7);-webkit-backdrop-filter:blur(22px) saturate(1.7);border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:12px;z-index:100;box-shadow:0 16px 40px -20px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.12)">
   <div style="display:flex;align-items:center;gap:10px">
     <div style="width:32px;height:32px;border-radius:9px;background:#2fbf71;display:flex;align-items:center;justify-content:center;font-size:16px">🛡️</div>
     <div>
@@ -29,3 +29,4 @@ $navItems = [
     <a href="logout.php" style="font-size:12.5px;color:#7fa494">Cerrar sesión</a>
   </div>
 </div>
+

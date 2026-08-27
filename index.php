@@ -85,6 +85,9 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
   .nav-item{padding:11px 13px;color:#9db8ac;display:flex;align-items:center;gap:11px;border-radius:10px;font-size:14px;cursor:pointer;transition:background .2s var(--ease-spring),color .2s var(--ease-spring)}
   .nav-item:hover{background:rgba(255,255,255,.07);color:#e3efe9}
   .nav-item.active{background:rgba(255,255,255,.12);color:#fff;font-weight:600;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+  /* Selector de ciudad: opciones legibles al desplegar (fondo oscuro, texto claro) */
+  #citySelect{color:#e3efe9}
+  #citySelect option{background:#10231f;color:#e3efe9}
   .muted{color:var(--muted)}
   /* Entrada ESCALONADA del contenido (respeta prefers-reduced-motion vía brand.css) */
   @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
@@ -106,9 +109,15 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
   #chat-log>*{animation:bubble-in .32s var(--ease-spring) both}
 
   /* ===== "LIQUID GLASS": brillo/reflejo en los verdes ===== */
-  /* Reflejo superior tipo cristal en la tarjeta verde del copago (hero) */
-  .hero::before{content:"";position:absolute;left:0;right:0;top:0;height:46%;pointer-events:none;
-    background:linear-gradient(180deg,rgba(255,255,255,.20),rgba(255,255,255,0))}
+  /* La tarjeta verde del copago como CRISTAL LÍQUIDO (conservando el verde):
+     reflejo superior + destello de luz que se desliza lento (glass shine). */
+  .hero::before{content:"";position:absolute;left:0;right:0;top:0;height:52%;pointer-events:none;z-index:0;
+    background:linear-gradient(180deg,rgba(255,255,255,.24),rgba(255,255,255,0))}
+  .hero::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+    background:linear-gradient(115deg,transparent 34%,rgba(255,255,255,.15) 48%,transparent 62%);
+    transform:translateX(-26%);animation:hero-shine 7s ease-in-out infinite}
+  @keyframes hero-shine{0%,100%{transform:translateX(-26%)}50%{transform:translateX(26%)}}
+  .hero>*{position:relative;z-index:1}
   /* Barras de hospitales con brillo tipo cristal líquido */
   #comparacion div[style*="height:11px"]{box-shadow:inset 0 1px 2px rgba(16,35,31,.10)}
   #comparacion div[style*="height:11px"]>div{position:relative;box-shadow:inset 0 1px 0 rgba(255,255,255,.45)}
@@ -120,7 +129,7 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
   #btn-tema{right:20px;left:auto;bottom:20px;z-index:1401}
   /* Botón flotante permanente de Clara (a la izquierda del de tema) */
   #chatFab{position:fixed;right:78px;bottom:20px;z-index:1400;display:inline-flex;align-items:center;gap:9px;
-    background:linear-gradient(180deg,#2fbf71,#12a266);color:#053023;border:none;border-radius:999px;
+    background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,0) 46%),linear-gradient(180deg,#2fbf71,#12a266);color:#053023;border:none;border-radius:999px;
     padding:13px 20px 13px 14px;font-family:'Sora',sans-serif;font-weight:700;font-size:14px;cursor:pointer;
     box-shadow:0 18px 40px -16px rgba(15,92,92,.7),inset 0 1px 0 rgba(255,255,255,.35);
     animation:fab-in .5s var(--ease-spring) .25s both;
@@ -130,15 +139,17 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
   #chatFab:active{transform:scale(.97)}
   @keyframes fab-in{from{opacity:0;transform:translateY(12px) scale(.9)}to{opacity:1;transform:none}}
   @keyframes fab-pulse{0%{box-shadow:0 0 0 0 rgba(47,191,113,.45)}70%{box-shadow:0 0 0 14px rgba(47,191,113,0)}100%{box-shadow:0 0 0 0 rgba(47,191,113,0)}}
-  #chatFab .ic{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-size:15px}
+  #chatFab .ic{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-size:15px;position:relative;z-index:3}
+  #chatFab .label{position:relative;z-index:3}
   /* Panel flotante del chat */
   .chat-dock{position:fixed;right:20px;bottom:20px;z-index:1450;
     width:min(392px,calc(100vw - 32px));height:min(564px,calc(100dvh - 32px));
     background:#10231f;border:1px solid #24463d;border-radius:20px;color:#e3efe9;
     display:none;flex-direction:column;overflow:hidden;
     box-shadow:0 44px 100px -30px rgba(0,0,0,.65);
-    transform:translateY(18px) scale(.98);opacity:0;
-    transition:transform .32s var(--ease-spring),opacity .32s var(--ease-spring)}
+    transform-origin:bottom right;
+    transform:translateY(28px) scale(.94);opacity:0;
+    transition:transform .5s var(--ease-spring),opacity .38s ease}
   .chat-dock.open{display:flex;transform:none;opacity:1}
   .chat-dock-head{display:flex;gap:10px;align-items:center;padding:16px 16px 12px;border-bottom:1px solid #1c332d}
   .chat-dock-head .x{margin-left:auto;background:transparent;border:none;color:#7fa494;font-size:22px;line-height:1;cursor:pointer;width:32px;height:32px;border-radius:8px}
@@ -372,15 +383,20 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
 
   // Chat flotante de Clara: abrir / cerrar (accesible desde el botón permanente)
   function abrirChat(){
-    document.getElementById('chatDock').classList.add('open');
+    var dock = document.getElementById('chatDock');
     document.getElementById('chatFab').style.display = 'none';
     var t = document.getElementById('btn-tema'); if(t) t.style.display = 'none';  // no tapar el chat
+    dock.style.display = 'flex';        // visible, pero aún en el estado oculto del CSS
+    void dock.offsetWidth;              // fuerza un "reflow" para capturar el estado inicial
+    dock.classList.add('open');         // ahora sí: sube suave y fluido
     var log = document.getElementById('chat-log');
     if(log) log.scrollTop = log.scrollHeight;
-    setTimeout(function(){ var i = document.getElementById('chat-input'); if(i) i.focus(); }, 60);
+    setTimeout(function(){ var i = document.getElementById('chat-input'); if(i) i.focus(); }, 130);
   }
   function cerrarChat(){
-    document.getElementById('chatDock').classList.remove('open');
+    var dock = document.getElementById('chatDock');
+    dock.classList.remove('open');                              // anima la salida
+    setTimeout(function(){ dock.style.display = ''; }, 480);    // oculta tras la animación
     document.getElementById('chatFab').style.display = '';
     var t = document.getElementById('btn-tema'); if(t) t.style.display = '';
   }

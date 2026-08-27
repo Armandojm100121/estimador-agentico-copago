@@ -110,6 +110,12 @@ select:focus-visible,
 /* ===== CAPA PREMIUM COMPARTIDA (aplica a TODAS las pantallas) ===== */
 :root{ --ease-spring:cubic-bezier(0.32,0.72,0,1); }
 
+/* Transiciones suaves entre páginas (Chrome/Edge): fundido cruzado, SIN
+   pantallazo blanco al navegar. En navegadores sin soporte, navega normal. */
+@view-transition { navigation: auto; }
+::view-transition-old(root),
+::view-transition-new(root){ animation-duration:.4s; animation-timing-function:cubic-bezier(0.32,0.72,0,1); }
+
 /* Grano de película sutil: da un acabado físico y "caro". Fijo y sin capturar
    clics. Cada pantalla puede sobrescribir su propio body::after si lo necesita. */
 body::after{

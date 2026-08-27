@@ -115,7 +115,7 @@ $diaLindo = function ($ymd) use ($mesEs) {
   .btn-ghost{background:var(--surface);border:1px solid var(--field-border);color:var(--text);font-size:13.5px;font-weight:500;padding:10px 16px;border-radius:11px;cursor:pointer;display:inline-flex;gap:7px}
   .btn-ghost:hover{border-color:var(--marca);color:var(--marca);transform:translateY(-1px)}
   .btn-ghost:active{transform:scale(.97)}
-  /* Entrada escalonada: las tarjetas se organizan solas al cargar */
+  /* Entrada escalonada: las tarjetas se organizan solas al cargar (y en cada navegación) */
   @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
   .card{animation:rise .55s var(--ease-spring) both}
   .card:nth-child(1){animation-delay:.03s}
