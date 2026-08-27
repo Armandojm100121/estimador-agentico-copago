@@ -107,6 +107,50 @@ select:focus-visible,
   40%{ transform:scale(1); opacity:1; }
 }
 
+/* ===== CAPA PREMIUM COMPARTIDA (aplica a TODAS las pantallas) ===== */
+:root{ --ease-spring:cubic-bezier(0.32,0.72,0,1); }
+
+/* Grano de película sutil: da un acabado físico y "caro". Fijo y sin capturar
+   clics. Cada pantalla puede sobrescribir su propio body::after si lo necesita. */
+body::after{
+  content:""; position:fixed; inset:0; z-index:60; pointer-events:none; opacity:.03;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Transiciones suaves por defecto para elementos interactivos (las pantallas
+   que ya definen la suya la mantienen). */
+a,button{ transition: color .2s var(--ease-spring), background-color .2s var(--ease-spring),
+                       border-color .2s var(--ease-spring), transform .2s var(--ease-spring),
+                       box-shadow .2s var(--ease-spring), filter .2s ease; }
+
+/* Evita el scroll HORIZONTAL en toda la app: el fondo decorativo (aurora) puede
+   sobresalir del borde, pero nunca debe permitir arrastrar la página de lado.
+   Clave para móviles. El scroll vertical se mantiene normal. */
+html{ overflow-x:hidden; }
+body{ overflow-x:hidden; max-width:100%; }
+
+/* ===== AURORA ANIMADA DE FONDO ===== */
+/* Manchas de luz verde/petróleo que se desplazan MUY lento. Fija, sin capturar
+   clics. Se pinta detrás del contenido. En pantallas cuyo fondo es el body. */
+body::before{
+  content:""; position:fixed; inset:-12%; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(38vw 38vw at 18% 20%, rgba(47,191,113,.16), transparent 60%),
+    radial-gradient(44vw 44vw at 84% 26%, rgba(15,92,92,.17), transparent 62%),
+    radial-gradient(36vw 36vw at 62% 92%, rgba(18,120,107,.14), transparent 60%);
+  animation: aurora-drift 26s ease-in-out infinite alternate;
+}
+@keyframes aurora-drift{
+  0%{transform:translate3d(-3%,-2%,0) scale(1)}
+  50%{transform:translate3d(2%,3%,0) scale(1.10)}
+  100%{transform:translate3d(3%,-3%,0) scale(1.05)}
+}
+/* El contenido por encima de la aurora (contenedores comunes de cada pantalla) */
+.wrap,.shell,.app,.card{ position:relative; z-index:1; }
+/* Tarjetas: elevación fluida al pasar el cursor (global) */
+.card{ transition: box-shadow .32s var(--ease-spring), transform .32s var(--ease-spring) !important; }
+.card:hover{ transform: translateY(-3px); }
+
 /* --- Accesibilidad (#13): respeta a quien pide menos movimiento --- */
 @media (prefers-reduced-motion: reduce){
   *, *::before, *::after{

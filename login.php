@@ -151,33 +151,82 @@ $h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
 <link rel="stylesheet" href="brand.css">
 <script>(function(){try{var t=localStorage.getItem('tema');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
 <style>
+  :root{ --ease-spring:cubic-bezier(0.32,0.72,0,1); }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);font-family:'IBM Plex Sans',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-  a{color:var(--marca);text-decoration:none;cursor:pointer}
+  body{
+    background:var(--bg);
+    background-image:
+      radial-gradient(1100px 560px at 12% -12%, rgba(47,191,113,.10), transparent 60%),
+      radial-gradient(880px 520px at 112% 118%, rgba(15,92,92,.12), transparent 55%);
+    font-family:'IBM Plex Sans',sans-serif;min-height:100dvh;
+    display:flex;align-items:center;justify-content:center;padding:24px;
+  }
+  a{color:var(--marca);text-decoration:none;cursor:pointer;transition:color .2s var(--ease-spring)}
   a:hover{color:var(--acento)}
   input,select{font-family:'IBM Plex Sans',sans-serif}
   input::placeholder{color:#9aa8a2}
   .sora{font-family:'Sora',sans-serif}
-  .shell{width:1080px;max-width:100%;background:var(--surface);border-radius:28px;overflow:hidden;box-shadow:0 30px 70px -40px rgba(16,35,31,.45);display:grid;grid-template-columns:1fr 1fr;min-height:640px}
-  .field{width:100%;border:1px solid var(--field-border);background:var(--surface-2);border-radius:12px;padding:13px 15px;font-size:14px;color:var(--text);outline:none;transition:border-color .15s,background .15s}
-  .field:focus{border-color:var(--marca);background:var(--surface)}
-  .btn-primary{width:100%;background:var(--marca);border:none;color:#fff;font-family:'Sora',sans-serif;font-weight:600;font-size:15px;padding:14px;border-radius:12px;cursor:pointer;transition:background .15s}
-  .btn-primary:hover{background:var(--marca-2)}
+
+  /* Doble bisel: la tarjeta parece una placa física, no un rectángulo plano */
+  .shell{
+    width:1080px;max-width:100%;background:var(--surface);
+    border:1px solid rgba(16,35,31,.06);border-radius:28px;overflow:hidden;
+    box-shadow:0 44px 100px -55px rgba(16,35,31,.55), 0 10px 30px -22px rgba(16,35,31,.30);
+    display:grid;grid-template-columns:1fr 1fr;min-height:640px;
+    animation:shell-in .85s var(--ease-spring) both;
+  }
+  @keyframes shell-in{ from{opacity:0;transform:translateY(18px) scale(.985)} to{opacity:1;transform:none} }
+  /* Animación de SALIDA: al enviar el formulario, la tarjeta se desvanece y sube */
+  body.leaving .shell{opacity:0;transform:translateY(-14px) scale(.985);transition:opacity .34s var(--ease-spring),transform .34s var(--ease-spring)}
+  body.leaving{transition:background-color .34s ease}
+
+  /* Etiqueta "eyebrow" premium sobre los títulos */
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:7px;font-family:'Sora',sans-serif;
+    font-size:10.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--marca);background:rgba(15,92,92,.08);border:1px solid rgba(15,92,92,.14);
+    padding:5px 12px;border-radius:999px;margin-bottom:15px;
+  }
+  .eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--acento);box-shadow:0 0 0 3px rgba(47,191,113,.18)}
+
+  /* Inputs con brillo interior y foco tipo anillo (haptic) */
+  .field{
+    width:100%;border:1px solid var(--field-border);background:var(--surface-2);
+    border-radius:12px;padding:13px 15px;font-size:14px;color:var(--text);outline:none;
+    box-shadow:inset 0 1px 2px rgba(16,35,31,.04);
+    transition:border-color .25s var(--ease-spring),box-shadow .25s var(--ease-spring),background .25s var(--ease-spring);
+  }
+  .field:focus{border-color:var(--marca);background:var(--surface);box-shadow:0 0 0 4px rgba(15,92,92,.12),inset 0 1px 2px rgba(16,35,31,.04)}
+
+  /* Botón con degradado + física de pulsación (spring) */
+  .btn-primary{
+    width:100%;background:linear-gradient(180deg,var(--marca-2),var(--marca));border:none;color:#fff;
+    font-family:'Sora',sans-serif;font-weight:600;font-size:15px;padding:14px;border-radius:12px;cursor:pointer;
+    box-shadow:0 12px 26px -14px rgba(15,92,92,.75),inset 0 1px 0 rgba(255,255,255,.14);
+    transition:transform .25s var(--ease-spring),box-shadow .25s var(--ease-spring),filter .2s ease;
+  }
+  .btn-primary:hover{filter:brightness(1.06);transform:translateY(-1px);box-shadow:0 16px 32px -14px rgba(15,92,92,.85),inset 0 1px 0 rgba(255,255,255,.18)}
+  .btn-primary:active{transform:scale(.985)}
+
   .lbl{font-size:12.5px;font-weight:600;color:var(--text);display:block;margin-bottom:7px}
   .err{background:#fdeaea;border:1px solid #f3c6c6;color:#b23c3c;font-size:13.5px;padding:11px 14px;border-radius:11px;margin-bottom:16px;line-height:1.5}
   .hidden{display:none}
   .pwd-wrap{position:relative}
   .pwd-wrap .field{padding-right:44px}
-  .pwd-eye{position:absolute;top:50%;right:8px;transform:translateY(-50%);width:30px;height:30px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#9aa8a2;border-radius:8px;padding:0}
+  .pwd-eye{position:absolute;top:50%;right:8px;transform:translateY(-50%);width:30px;height:30px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#9aa8a2;border-radius:8px;padding:0;transition:color .2s var(--ease-spring)}
   .pwd-eye:hover{color:var(--marca)}
   .pwd-eye:focus-visible{outline:2px solid var(--marca);outline-offset:2px}
   .pwd-eye svg{width:19px;height:19px;display:block}
   .pwd-eye .eye-off{display:none}
   .pwd-eye.on .eye-open{display:none}
   .pwd-eye.on .eye-off{display:block}
-  .formside{padding:48px 52px;display:flex;flex-direction:column;justify-content:center;background:var(--surface)}
+  .formside{padding:52px 52px;display:flex;flex-direction:column;justify-content:center;background:var(--surface)}
+
+  /* Tarjetas de estadística (doble bisel) en el panel de marca */
+  .stat{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+
   @media(max-width:860px){.shell{grid-template-columns:1fr;min-height:auto}.brand-side{display:none}}
-  @media(max-width:560px){body{padding:14px}.shell{border-radius:20px}.formside{padding:34px 24px}}
+  @media(max-width:560px){body{padding:14px}.shell{border-radius:20px}.formside{padding:36px 24px}}
 </style>
 </head>
 <body>
@@ -186,6 +235,7 @@ $h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
   <!-- BRAND SIDE -->
   <div class="brand-side" style="background:#0d1f1b;color:#e3efe9;padding:44px 42px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden">
     <div style="position:absolute;right:-80px;bottom:-80px;width:340px;height:340px;background:radial-gradient(circle,#2fbf71 0%,transparent 70%);opacity:.28"></div>
+    <div style="position:absolute;left:-110px;top:-90px;width:300px;height:300px;background:radial-gradient(circle,#12786b 0%,transparent 70%);opacity:.35"></div>
     <div style="display:flex;align-items:center;gap:11px;position:relative">
       <div class="sora" style="width:36px;height:36px;border-radius:10px;background:#2fbf71;display:flex;align-items:center;justify-content:center;color:#053023;font-weight:700;font-size:19px">c</div>
       <span class="sora" style="font-weight:700;font-size:18px;color:#fff">Estimador Copago</span>
@@ -193,9 +243,9 @@ $h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
     <div style="position:relative">
       <h1 class="sora" style="font-size:30px;font-weight:700;line-height:1.25;letter-spacing:-0.02em;color:#fff">Sabe cuánto vas a pagar, antes de ir al médico.</h1>
       <p style="font-size:15px;line-height:1.6;color:#9db8ac;margin-top:16px;max-width:38ch">Ingresa tu plan y la IA te dice el copago más accesible para tu tratamiento, en lenguaje simple.</p>
-      <div style="display:flex;gap:26px;margin-top:32px">
-        <div><div class="sora" style="font-size:24px;font-weight:800;color:#7ff0b3">$248</div><div style="font-size:12px;color:#7fa494">ahorro promedio / año</div></div>
-        <div><div class="sora" style="font-size:24px;font-weight:800;color:#7ff0b3">12+</div><div style="font-size:12px;color:#7fa494">aseguradoras en Ecuador</div></div>
+      <div style="display:flex;gap:14px;margin-top:32px">
+        <div class="stat"><div class="sora" style="font-size:24px;font-weight:800;color:#7ff0b3">$248</div><div style="font-size:12px;color:#7fa494;margin-top:2px">ahorro promedio / año</div></div>
+        <div class="stat"><div class="sora" style="font-size:24px;font-weight:800;color:#7ff0b3">12+</div><div style="font-size:12px;color:#7fa494;margin-top:2px">aseguradoras en Ecuador</div></div>
       </div>
     </div>
     <div style="position:relative;font-size:12.5px;color:#5f7a70">Tus datos de salud se mantienen privados y cifrados.</div>
@@ -211,8 +261,9 @@ $h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
 
       <!-- ====== LOGIN ====== -->
       <div id="panel-login" class="<?= $modo === 'registro' ? 'hidden' : '' ?>">
-        <h2 class="sora" style="font-size:24px;font-weight:700;letter-spacing:-0.02em;color:#10231f">Inicia sesión</h2>
-        <p style="font-size:14px;color:#7a8681;margin-top:6px">Bienvenido de nuevo. Continúa con tu estimación.</p>
+        <span class="eyebrow">Bienvenido</span>
+        <h2 class="sora" style="font-size:25px;font-weight:700;letter-spacing:-0.02em;color:var(--text)">Inicia sesión</h2>
+        <p style="font-size:14px;color:var(--muted);margin-top:6px">Bienvenido de nuevo. Continúa con tu estimación.</p>
         <form method="post" style="display:flex;flex-direction:column;gap:14px;margin-top:26px">
           <input type="hidden" name="modo" value="login">
           <div>
@@ -236,8 +287,9 @@ $h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
 
       <!-- ====== REGISTRO ====== -->
       <div id="panel-registro" class="<?= $modo === 'registro' ? '' : 'hidden' ?>">
-        <h2 class="sora" style="font-size:24px;font-weight:700;letter-spacing:-0.02em;color:#10231f">Crea tu cuenta</h2>
-        <p style="font-size:14px;color:#7a8681;margin-top:6px">Regístrate y elige tu plan para empezar.</p>
+        <span class="eyebrow">Nueva cuenta</span>
+        <h2 class="sora" style="font-size:25px;font-weight:700;letter-spacing:-0.02em;color:var(--text)">Crea tu cuenta</h2>
+        <p style="font-size:14px;color:var(--muted);margin-top:6px">Regístrate y elige tu plan para empezar.</p>
         <form method="post" style="display:flex;flex-direction:column;gap:14px;margin-top:22px">
           <input type="hidden" name="modo" value="registro">
           <div>
@@ -290,6 +342,18 @@ $h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
     btn.classList.toggle('on', mostrar);
     btn.setAttribute('aria-label', mostrar ? 'Ocultar contraseña' : 'Mostrar contraseña');
   }
+
+  // Transición de SALIDA al enviar el formulario (Entrar / Crear cuenta).
+  // Si el formulario es inválido, dejamos que el navegador muestre su validación
+  // (no animamos). Si es válido, reproducimos la animación y enviamos al terminar.
+  document.querySelectorAll('form').forEach(function(f){
+    f.addEventListener('submit', function(e){
+      if(!f.checkValidity()) return;              // deja la validación nativa del navegador
+      e.preventDefault();
+      document.body.classList.add('leaving');
+      setTimeout(function(){ f.submit(); }, 340); // envía cuando termina la animación
+    });
+  });
 </script>
 <script src="theme.js"></script>
 </body>

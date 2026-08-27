@@ -10,6 +10,11 @@ mail.local.php
 # Registro de guardrails (se regenera en tiempo de ejecución)
 guardrails.log
 
+# Skills y herramientas de IA (no forman parte de la app)
+.agents/
+.claude/
+skills-lock.json
+
 # Sistema
 .DS_Store
 Thumbs.db

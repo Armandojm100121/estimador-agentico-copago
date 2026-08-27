@@ -110,17 +110,30 @@ $diaLindo = function ($ymd) use ($mesEs) {
   a{color:var(--marca);text-decoration:none}
   .sora{font-family:'Sora',sans-serif}
   .wrap{max-width:1000px;margin:0 auto}
-  .card{background:var(--surface);border:1px solid var(--borde);border-radius:16px;padding:20px 22px;color:var(--text)}
+  .card{background:var(--surface);border:1px solid var(--borde);border-radius:16px;padding:20px 22px;color:var(--text);box-shadow:0 18px 44px -34px rgba(16,35,31,.4);transition:box-shadow .3s var(--ease-spring)}
+  .card:hover{box-shadow:0 26px 60px -38px rgba(16,35,31,.5)}
   .btn-ghost{background:var(--surface);border:1px solid var(--field-border);color:var(--text);font-size:13.5px;font-weight:500;padding:10px 16px;border-radius:11px;cursor:pointer;display:inline-flex;gap:7px}
-  .btn-ghost:hover{border-color:var(--marca);color:var(--marca)}
+  .btn-ghost:hover{border-color:var(--marca);color:var(--marca);transform:translateY(-1px)}
+  .btn-ghost:active{transform:scale(.97)}
+  /* Entrada escalonada: las tarjetas se organizan solas al cargar */
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  .card{animation:rise .55s var(--ease-spring) both}
+  .card:nth-child(1){animation-delay:.03s}
+  .card:nth-child(2){animation-delay:.08s}
+  .card:nth-child(3){animation-delay:.13s}
+  .card:nth-child(4){animation-delay:.18s}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:'Sora',sans-serif;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--marca);margin-bottom:9px}
+  .eyebrow::before{content:"";width:16px;height:2px;border-radius:2px;background:var(--acento)}
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
   .kpi .n{font-family:'Sora',sans-serif;font-weight:800;font-size:30px;margin-top:6px}
   .muted{color:var(--muted);font-size:12.5px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
   .row{display:flex;align-items:center;gap:10px;margin:9px 0}
   .row .lbl{width:130px;font-size:13px;flex-shrink:0}
-  .row .bar{flex:1;height:12px;background:var(--surface-2);border-radius:6px;overflow:hidden}
-  .row .bar>div{height:100%;border-radius:6px}
+  .row .bar{flex:1;height:12px;background:var(--surface-2);border-radius:6px;overflow:hidden;box-shadow:inset 0 1px 2px rgba(16,35,31,.10)}
+  /* Barras verdes con acabado "liquid glass": reflejo superior + brillo interior */
+  .row .bar>div{height:100%;border-radius:6px;position:relative;box-shadow:inset 0 1px 0 rgba(255,255,255,.45)}
+  .row .bar>div::after{content:"";position:absolute;inset:0;border-radius:6px;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.42),rgba(255,255,255,0) 55%)}
   .row .val{width:34px;text-align:right;font-weight:600;font-size:13px}
   h3.t{font-size:15px;font-weight:600;margin-bottom:14px}
   .chip{display:inline-block;font-size:11.5px;background:var(--surface-2);color:var(--muted);padding:4px 10px;border-radius:8px}
@@ -133,8 +146,9 @@ $diaLindo = function ($ymd) use ($mesEs) {
   <?php $activo = 'metricas'; include __DIR__ . '/admin_nav.php'; ?>
 
   <div style="margin-bottom:20px">
-    <h1 class="sora" style="font-size:25px;font-weight:700;letter-spacing:-.02em">Métricas del sistema</h1>
-    <p class="muted" style="margin-top:4px">Datos agregados de todas las consultas del sistema.</p>
+    <span class="eyebrow">Panel · Métricas</span>
+    <h1 class="sora" style="font-size:27px;font-weight:800;letter-spacing:-.03em;line-height:1.1">Métricas del sistema</h1>
+    <p class="muted" style="margin-top:5px">Datos agregados de todas las consultas del sistema.</p>
   </div>
 
   <?php if ($err): ?>

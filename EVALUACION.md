@@ -40,8 +40,15 @@ especialidades), con síntomas en lenguaje natural y la especialidad esperada
 
 Definidos en `eval_modelos.php` (precios públicos de Groq, referenciales):
 
-- `llama-3.3-70b-versatile` — el de producción.
-- `llama-3.1-8b-instant` — alternativa más barata y rápida.
+- `openai/gpt-oss-120b` — el modelo grande (mayor precisión esperada, más caro).
+- `openai/gpt-oss-20b` — el de **producción** (`config.php`): más rápido y barato,
+  encaja mejor en el límite gratis de Groq (8.000 tokens/min).
+
+> Nota histórica: originalmente la app usaba `llama-3.3-70b-versatile`, pero Groq
+> **retiró todos los modelos Llama** (ago. 2026), por lo que se migró a la familia
+> **GPT-OSS**. El código de evaluación es el mismo; solo cambió el catálogo de
+> modelos. Ambos GPT-OSS "razonan" internamente, así que se ejecutan con
+> `reasoning_effort=low` para acotar el costo de tokens de salida.
 
 ## Cómo reproducir
 
@@ -54,10 +61,11 @@ Definidos en `eval_modelos.php` (precios públicos de Groq, referenciales):
 
 ## Hallazgo esperable (trade-off)
 
-El modelo grande (70B) suele lograr **mayor precisión** a **mayor costo**; el
-pequeño (8B) es **más barato** pero comete más errores e incluso puede **fallar
-el function calling** en algún caso. Reportar este trade-off (precisión vs.
-costo) es el resultado central de esta sección.
+El modelo grande (120B) suele lograr **mayor precisión** a **mayor costo**; el
+pequeño (20B) es **más barato y rápido** pero puede cometer más errores e incluso
+**fallar el function calling** en algún caso. Reportar este trade-off (precisión
+vs. costo/latencia) es el resultado central de esta sección, y justifica la
+elección del 20B en producción: precisión suficiente al menor costo.
 
 ## Archivos
 

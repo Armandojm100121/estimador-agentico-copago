@@ -46,39 +46,122 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
 <link rel="stylesheet" href="brand.css">
 <script>(function(){try{var t=localStorage.getItem('tema');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();</script>
 <style>
+  :root{ --ease-spring:cubic-bezier(0.32,0.72,0,1); }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
-  body{background:var(--panel);font-family:'IBM Plex Sans',sans-serif}
-  a{color:var(--marca);text-decoration:none}
+  html{background:var(--surface-2)}
+  body{background:var(--surface-2);font-family:'IBM Plex Sans',sans-serif}
+  a{color:var(--marca);text-decoration:none;transition:color .2s var(--ease-spring)}
   a:hover{color:#2fbf71}
   input{font-family:'IBM Plex Sans',sans-serif}
   input::placeholder{color:#9aa8a2}
   ::-webkit-scrollbar{width:8px;height:8px}
   ::-webkit-scrollbar-thumb{background:#cdd6d1;border-radius:8px}
+  ::-webkit-scrollbar-thumb:hover{background:#b6c2bc}
   /* App a pantalla completa con barra lateral colapsable (menú hamburguesa) */
   .app{width:100%;min-height:100vh;background:var(--surface);display:grid;grid-template-columns:300px 1fr;color:var(--text);transition:grid-template-columns .25s ease}
   .app.collapsed{grid-template-columns:0 1fr}
-  aside{overflow:hidden}
+  aside{overflow:hidden;position:relative}
+  aside>*{position:relative;z-index:1}
+  /* Aurora sutil moviéndose DETRÁS de los recuadros de vidrio de la barra lateral */
+  aside::before{content:"";position:absolute;inset:-20%;z-index:0;pointer-events:none;
+    background:radial-gradient(50% 40% at 28% 14%,rgba(47,191,113,.16),transparent 60%),radial-gradient(55% 46% at 82% 82%,rgba(18,120,107,.18),transparent 62%);
+    animation:aurora-drift 24s ease-in-out infinite alternate}
   .app.collapsed aside{visibility:hidden}
-  .hamburger{width:40px;height:40px;border-radius:11px;border:1px solid var(--field-border);background:var(--surface);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;flex-shrink:0}
+  .hamburger{width:40px;height:40px;border-radius:11px;border:1px solid var(--field-border);background:var(--surface);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;flex-shrink:0;transition:border-color .2s var(--ease-spring),transform .2s var(--ease-spring)}
   .hamburger:hover{border-color:var(--marca)}
+  .hamburger:active{transform:scale(.94)}
   .hamburger span{width:17px;height:2px;background:var(--text);border-radius:2px}
   .sora{font-family:'Sora',sans-serif}
-  .chip{font-size:12px;background:#1c332d;color:#9db8ac;padding:6px 11px;border-radius:999px;cursor:pointer;border:none}
-  .chip:hover{background:#25423a}
-  .btn-primary{background:var(--marca);border:none;color:#fff;font-family:'Sora',sans-serif;font-weight:600;font-size:13.5px;padding:10px 18px;border-radius:11px;cursor:pointer}
-  .btn-primary:hover{background:var(--marca-2)}
-  .btn-ghost{background:var(--surface);border:1px solid var(--field-border);color:var(--text);font-size:13.5px;font-weight:500;padding:10px 16px;border-radius:11px;cursor:pointer}
-  .btn-ghost:hover{border-color:var(--marca);color:var(--marca)}
-  .card{background:var(--surface);border:1px solid var(--borde);border-radius:20px;padding:24px;color:var(--text)}
-  .nav-item{padding:11px 13px;color:#9db8ac;display:flex;align-items:center;gap:11px;border-radius:10px;font-size:14px;cursor:pointer}
-  .nav-item:hover{background:#152b25;color:#e3efe9}
-  .nav-item.active{background:#1c332d;color:#fff;font-weight:600}
+  .chip{font-size:12px;background:#1c332d;color:#9db8ac;padding:6px 11px;border-radius:999px;cursor:pointer;border:none;transition:background .2s var(--ease-spring),transform .2s var(--ease-spring)}
+  .chip:hover{background:#25423a;transform:translateY(-1px)}
+  .chip:active{transform:scale(.96)}
+  .btn-primary{background:linear-gradient(180deg,var(--marca-2),var(--marca));border:none;color:#fff;font-family:'Sora',sans-serif;font-weight:600;font-size:13.5px;padding:10px 18px;border-radius:11px;cursor:pointer;box-shadow:0 10px 22px -14px rgba(15,92,92,.7),inset 0 1px 0 rgba(255,255,255,.14);transition:transform .25s var(--ease-spring),box-shadow .25s var(--ease-spring),filter .2s ease}
+  .btn-primary:hover{filter:brightness(1.06);transform:translateY(-1px);box-shadow:0 14px 28px -14px rgba(15,92,92,.8),inset 0 1px 0 rgba(255,255,255,.18)}
+  .btn-primary:active{transform:scale(.97)}
+  .btn-ghost{background:var(--surface);border:1px solid var(--field-border);color:var(--text);font-size:13.5px;font-weight:500;padding:10px 16px;border-radius:11px;cursor:pointer;transition:border-color .2s var(--ease-spring),color .2s var(--ease-spring),transform .2s var(--ease-spring)}
+  .btn-ghost:hover:not([disabled]){border-color:var(--marca);color:var(--marca);transform:translateY(-1px)}
+  .card{background:var(--surface);border:1px solid var(--borde);border-radius:20px;padding:24px;color:var(--text);box-shadow:0 18px 44px -34px rgba(16,35,31,.4);transition:box-shadow .3s var(--ease-spring)}
+  .card:hover{box-shadow:0 26px 60px -38px rgba(16,35,31,.5)}
+  .nav-item{padding:11px 13px;color:#9db8ac;display:flex;align-items:center;gap:11px;border-radius:10px;font-size:14px;cursor:pointer;transition:background .2s var(--ease-spring),color .2s var(--ease-spring)}
+  .nav-item:hover{background:rgba(255,255,255,.07);color:#e3efe9}
+  .nav-item.active{background:rgba(255,255,255,.12);color:#fff;font-weight:600;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
   .muted{color:var(--muted)}
+  /* Entrada ESCALONADA del contenido (respeta prefers-reduced-motion vía brand.css) */
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  .main>*{animation:rise .7s var(--ease-spring) both;position:relative;z-index:1}
+  .main>*:nth-child(2){animation-delay:.05s}
+  .main>*:nth-child(3){animation-delay:.10s}
+  .main>*:nth-child(4){animation-delay:.15s}
+  .main>*:nth-child(5){animation-delay:.20s}
+  .main>*:nth-child(6){animation-delay:.25s}
+  /* Aurora animada DENTRO del contenido (el dashboard es opaco y tapa el body) */
+  .main::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(40vw 40vw at 14% 14%, rgba(47,191,113,.13), transparent 60%),
+      radial-gradient(46vw 46vw at 88% 22%, rgba(15,92,92,.13), transparent 62%),
+      radial-gradient(38vw 38vw at 60% 96%, rgba(18,120,107,.11), transparent 60%);
+    animation:aurora-drift 28s ease-in-out infinite alternate}
+  /* Burbujas del chat: entran con un pop suave (se aplica a las que agrega el JS) */
+  @keyframes bubble-in{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+  #chat-log>*{animation:bubble-in .32s var(--ease-spring) both}
+
+  /* ===== "LIQUID GLASS": brillo/reflejo en los verdes ===== */
+  /* Reflejo superior tipo cristal en la tarjeta verde del copago (hero) */
+  .hero::before{content:"";position:absolute;left:0;right:0;top:0;height:46%;pointer-events:none;
+    background:linear-gradient(180deg,rgba(255,255,255,.20),rgba(255,255,255,0))}
+  /* Barras de hospitales con brillo tipo cristal líquido */
+  #comparacion div[style*="height:11px"]{box-shadow:inset 0 1px 2px rgba(16,35,31,.10)}
+  #comparacion div[style*="height:11px"]>div{position:relative;box-shadow:inset 0 1px 0 rgba(255,255,255,.45)}
+  #comparacion div[style*="height:11px"]>div::after{content:"";position:absolute;inset:0;border-radius:6px;pointer-events:none;
+    background:linear-gradient(180deg,rgba(255,255,255,.42),rgba(255,255,255,0) 55%)}
+
+  /* ===== CHAT FLOTANTE (Clara siempre accesible) ===== */
+  /* El botón de tema (🌙/☀️) va JUNTO al de Clara, esquina inferior derecha */
+  #btn-tema{right:20px;left:auto;bottom:20px;z-index:1401}
+  /* Botón flotante permanente de Clara (a la izquierda del de tema) */
+  #chatFab{position:fixed;right:78px;bottom:20px;z-index:1400;display:inline-flex;align-items:center;gap:9px;
+    background:linear-gradient(180deg,#2fbf71,#12a266);color:#053023;border:none;border-radius:999px;
+    padding:13px 20px 13px 14px;font-family:'Sora',sans-serif;font-weight:700;font-size:14px;cursor:pointer;
+    box-shadow:0 18px 40px -16px rgba(15,92,92,.7),inset 0 1px 0 rgba(255,255,255,.35);
+    animation:fab-in .5s var(--ease-spring) .25s both;
+    transition:transform .25s var(--ease-spring),box-shadow .25s var(--ease-spring)}
+  #chatFab::before{content:"";position:absolute;inset:0;border-radius:999px;pointer-events:none;animation:fab-pulse 2.8s ease-out infinite}
+  #chatFab:hover{transform:translateY(-2px);box-shadow:0 22px 48px -16px rgba(15,92,92,.8),inset 0 1px 0 rgba(255,255,255,.4)}
+  #chatFab:active{transform:scale(.97)}
+  @keyframes fab-in{from{opacity:0;transform:translateY(12px) scale(.9)}to{opacity:1;transform:none}}
+  @keyframes fab-pulse{0%{box-shadow:0 0 0 0 rgba(47,191,113,.45)}70%{box-shadow:0 0 0 14px rgba(47,191,113,0)}100%{box-shadow:0 0 0 0 rgba(47,191,113,0)}}
+  #chatFab .ic{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;font-size:15px}
+  /* Panel flotante del chat */
+  .chat-dock{position:fixed;right:20px;bottom:20px;z-index:1450;
+    width:min(392px,calc(100vw - 32px));height:min(564px,calc(100dvh - 32px));
+    background:#10231f;border:1px solid #24463d;border-radius:20px;color:#e3efe9;
+    display:none;flex-direction:column;overflow:hidden;
+    box-shadow:0 44px 100px -30px rgba(0,0,0,.65);
+    transform:translateY(18px) scale(.98);opacity:0;
+    transition:transform .32s var(--ease-spring),opacity .32s var(--ease-spring)}
+  .chat-dock.open{display:flex;transform:none;opacity:1}
+  .chat-dock-head{display:flex;gap:10px;align-items:center;padding:16px 16px 12px;border-bottom:1px solid #1c332d}
+  .chat-dock-head .x{margin-left:auto;background:transparent;border:none;color:#7fa494;font-size:22px;line-height:1;cursor:pointer;width:32px;height:32px;border-radius:8px}
+  .chat-dock-head .x:hover{background:#1c332d;color:#fff}
+  .chat-dock #chat-log{max-height:none!important;flex:1 1 auto;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+  .chat-dock .sugs{display:flex;gap:7px;flex-wrap:wrap;padding:2px 16px 8px}
+  .chat-dock .inrow{display:flex;align-items:center;gap:9px;background:#fff;border-radius:13px;padding:6px 6px 6px 15px;margin:0 16px 16px}
+  @media(max-width:560px){
+    .chat-dock{right:10px;left:10px;bottom:10px;width:auto;height:min(78dvh,560px)}
+    #chatFab{right:74px;bottom:16px;padding:12px 14px}
+    #chatFab .label{display:none}
+    #btn-tema{right:16px;bottom:16px}
+  }
   .metrics{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:16px}
   .cols{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-  .main{padding:32px 38px 34px;display:flex;flex-direction:column;gap:24px;background:var(--surface-2);min-width:0}
+  .main{padding:32px 38px 34px;display:flex;flex-direction:column;gap:24px;background:var(--surface-2);background-image:radial-gradient(900px 420px at 100% -6%,rgba(47,191,113,.06),transparent 60%),radial-gradient(720px 380px at -6% 112%,rgba(15,92,92,.05),transparent 55%);min-width:0;position:relative;overflow:hidden}
   .backdrop{display:none}
+  /* Grano de película sutil (premium, físico). Fijo y sin capturar clics. */
+  body::after{content:"";position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.035;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+  /* Etiqueta eyebrow sobre los títulos de sección */
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:'Sora',sans-serif;font-size:10px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--marca);margin-bottom:9px}
+  .eyebrow::before{content:"";width:16px;height:2px;border-radius:2px;background:var(--acento)}
 
   /* Tema oscuro (#12): remapea los textos y bordes fijos DENTRO de las tarjetas
      del contenido para que sean legibles sobre superficies oscuras. La barra
@@ -127,12 +210,12 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
       <span class="sora" style="font-weight:700;font-size:16px;color:#fff">Estimador Copago</span>
     </div>
 
-    <div style="background:#152b25;border-radius:14px;padding:16px">
+    <div style="background:rgba(255,255,255,.06);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);border:1px solid rgba(255,255,255,.10);box-shadow:inset 0 1px 0 rgba(255,255,255,.10);border-radius:14px;padding:16px">
       <div style="font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:#7fa494;margin-bottom:9px">Tu plan activo</div>
       <div style="font-size:14px;line-height:1.5;color:#e3efe9;font-weight:500"><?= $h($planTxt) ?></div>
       <label style="display:block;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:#7fa494;margin:14px 0 7px">Ciudad de atención</label>
       <select id="citySelect" aria-label="Ciudad de atención" onchange="cambiarCiudad(this.value)"
-        style="width:100%;background:#0d1f1b;color:#e3efe9;border:1px solid #2c463f;border-radius:10px;padding:9px 11px;font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;cursor:pointer;outline:none">
+        style="width:100%;background:rgba(255,255,255,.06);color:#e3efe9;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:9px 11px;font-family:'IBM Plex Sans',sans-serif;font-size:13.5px;cursor:pointer;outline:none">
         <?php foreach ($ciudades as $c): ?>
           <option value="<?= $h($c) ?>"<?= $c === $ciudadActual ? ' selected' : '' ?>><?= $h($c) ?></option>
         <?php endforeach; ?>
@@ -141,26 +224,26 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
 
     <nav aria-label="Navegación principal" style="display:flex;flex-direction:column;gap:3px">
       <div class="nav-item active" onclick="cerrarMenuMovil()">◈ Recomendación</div>
-      <div class="nav-item" onclick="cerrarMenuMovil();document.getElementById('chat-input').focus()">✦ Chat con la IA</div>
+      <div class="nav-item" onclick="cerrarMenuMovil();abrirChat()">✦ Chat con la IA</div>
       <div class="nav-item" onclick="cerrarMenuMovil();reiniciar()">◷ Nueva consulta</div>
       <a href="historial.php" class="nav-item" style="color:#9db8ac;text-decoration:none">◱ Historial</a>
     </nav>
 
     <?php if ($esAdmin): ?>
       <!-- Único acceso al ÁREA DE ADMINISTRACIÓN (pantalla aparte). Solo lo ve el admin. -->
-      <a href="metricas.php" style="display:flex;align-items:center;gap:10px;background:#152b25;border:1px solid #2c463f;border-radius:12px;padding:12px 14px;text-decoration:none;color:#cfe0d8">
+      <a href="metricas.php" style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);border:1px solid rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.10);border-radius:12px;padding:12px 14px;text-decoration:none;color:#cfe0d8">
         <span style="font-size:16px">🛡️</span>
         <span><span style="display:block;font-size:13.5px;font-weight:600;color:#fff">Panel de administración</span><span style="font-size:11.5px;color:#7fa494">Métricas · Gestión · Evaluación</span></span>
       </a>
     <?php endif; ?>
 
-    <div style="background:#152b25;border-radius:14px;padding:15px">
+    <div style="background:rgba(255,255,255,.06);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);border:1px solid rgba(255,255,255,.10);box-shadow:inset 0 1px 0 rgba(255,255,255,.10);border-radius:14px;padding:15px">
       <div style="font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:#7fa494;margin-bottom:8px">Cómo funciona</div>
       <div style="font-size:12.5px;color:#9db8ac;line-height:1.55">Cuéntale tu síntoma a la IA. Ella deduce el especialista y calcula tu copago real desde tu póliza.</div>
     </div>
 
     <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px">
-      <div style="background:#152b25;border-radius:14px;padding:13px;display:flex;gap:11px;align-items:center">
+      <div style="background:rgba(255,255,255,.06);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);border:1px solid rgba(255,255,255,.10);box-shadow:inset 0 1px 0 rgba(255,255,255,.10);border-radius:14px;padding:13px;display:flex;gap:11px;align-items:center">
         <div style="width:36px;height:36px;border-radius:50%;background:#2fbf71;color:#053023;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex-shrink:0"><?= $h($ini) ?></div>
         <div style="min-width:0"><div style="font-size:13.5px;color:#fff;font-weight:600"><?= $h($u['nombre']) ?></div><div style="font-size:12px;color:#7fa494;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= $h($planTxt) ?></div></div>
       </div>
@@ -175,8 +258,8 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
       <div style="display:flex;align-items:flex-start;gap:14px">
         <button class="hamburger" onclick="toggleMenu()" aria-label="Menú"><span></span><span></span><span></span></button>
         <div>
-          <div style="font-size:13px;color:#7a8681;margin-bottom:6px">Hola <?= $h($u['nombre']) ?> · tu estimación en tiempo real</div>
-          <h1 class="sora" style="font-size:28px;font-weight:700;letter-spacing:-0.02em">El hospital más accesible para ti</h1>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:7px">Hola <?= $h($u['nombre']) ?> · tu estimación en tiempo real</div>
+          <h1 class="sora" style="font-size:32px;font-weight:800;letter-spacing:-0.03em;line-height:1.1">El hospital más accesible para ti</h1>
         </div>
       </div>
       <button id="btnPdf" class="btn-ghost" onclick="descargarPDF()" disabled title="Haz una consulta para poder descargar el comprobante" style="opacity:.45;cursor:not-allowed">⬇ Descargar PDF</button>
@@ -197,11 +280,12 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
 
     <!-- metric row -->
     <div class="metrics" id="resumen" style="scroll-margin-top:16px">
-      <div style="background:linear-gradient(135deg,#0f5c5c,#12786b);border-radius:20px;padding:26px;color:#eafaf3;position:relative;overflow:hidden">
-        <div style="position:absolute;right:-30px;top:-30px;width:150px;height:150px;background:radial-gradient(circle,#2fbf71 0%,transparent 70%);opacity:.35"></div>
-        <div style="display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.15);font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;margin-bottom:16px">✦ Recomendado para ti</div>
-        <div class="sora" id="m-hospital" style="font-size:22px;font-weight:700">Aún sin estimación</div>
-        <div style="display:flex;align-items:flex-end;gap:10px;margin-top:12px"><span class="sora" id="m-copago" style="font-size:46px;font-weight:800;line-height:1">—</span><span id="m-copago-sub" style="font-size:13.5px;opacity:.8;padding-bottom:9px">copago de esta visita</span></div>
+      <div class="hero" style="background:linear-gradient(135deg,#0f5c5c,#12786b);border:1px solid rgba(255,255,255,.10);border-radius:22px;padding:28px;color:#eafaf3;position:relative;overflow:hidden;box-shadow:0 26px 60px -34px rgba(15,92,92,.75),inset 0 1px 0 rgba(255,255,255,.12)">
+        <div style="position:absolute;right:-30px;top:-30px;width:170px;height:170px;background:radial-gradient(circle,#2fbf71 0%,transparent 70%);opacity:.38"></div>
+        <div style="position:absolute;left:-50px;bottom:-60px;width:180px;height:180px;background:radial-gradient(circle,#7ff0b3 0%,transparent 70%);opacity:.15"></div>
+        <div style="display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.12);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:6px 12px;border-radius:999px;margin-bottom:18px;position:relative">✦ Recomendado para ti</div>
+        <div class="sora" id="m-hospital" style="font-size:22px;font-weight:700;position:relative">Aún sin estimación</div>
+        <div style="display:flex;align-items:flex-end;gap:10px;margin-top:14px;position:relative"><span class="sora" id="m-copago" style="font-size:52px;font-weight:800;line-height:1;letter-spacing:-0.02em">—</span><span id="m-copago-sub" style="font-size:13.5px;opacity:.82;padding-bottom:11px">copago de esta visita</span></div>
       </div>
       <div class="card" style="border-radius:20px;display:flex;flex-direction:column;justify-content:center">
         <div style="font-size:13px;color:#7a8681">Ahorro vs. más caro</div>
@@ -221,64 +305,63 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
 
     <div class="cols">
 
-      <!-- LEFT column -->
-      <div style="display:flex;flex-direction:column;gap:20px">
-
-        <div class="card">
-          <h3 class="sora" style="font-size:15px;font-weight:600;margin-bottom:6px">Desglose de tu estimación</h3>
-          <p class="muted" style="font-size:12.5px;margin-bottom:18px" id="desglose-sub">Cuéntale tu síntoma a la IA para ver el detalle.</p>
-          <div id="desglose" style="display:flex;flex-direction:column">
-            <div class="muted" style="font-size:13.5px;line-height:1.6;padding:8px 0">Cuando la IA identifique tu especialista, aquí verás la especialidad, el hospital recomendado, el porcentaje que cubre tu seguro y tu copago final.</div>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3 class="sora" style="font-size:15px;font-weight:600;margin-bottom:16px">Qué significa esto, en simple</h3>
-          <div style="display:flex;flex-direction:column;gap:13px">
-            <div style="display:flex;gap:12px;align-items:flex-start"><span style="width:22px;height:22px;border-radius:50%;background:#e2f6ec;color:#128a4e;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">✓</span><span style="font-size:13.5px;line-height:1.55;color:#334741">El <b>copago</b> es lo único que pagas tú; el resto lo cubre tu seguro según tu plan.</span></div>
-            <div style="display:flex;gap:12px;align-items:flex-start"><span style="width:22px;height:22px;border-radius:50%;background:#e2f6ec;color:#128a4e;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">✓</span><span style="font-size:13.5px;line-height:1.55;color:#334741">Comparamos los <b>hospitales de tu red</b> en tu ciudad y te mostramos el más económico.</span></div>
-            <div style="display:flex;gap:12px;align-items:flex-start"><span style="width:22px;height:22px;border-radius:50%;background:#e2f6ec;color:#128a4e;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">✓</span><span style="font-size:13.5px;line-height:1.55;color:#334741">Los montos salen de <b>tu póliza real</b>, no son inventados por la IA.</span></div>
-          </div>
+      <!-- Desglose de la estimación -->
+      <div class="card">
+        <span class="eyebrow">Tu estimación</span>
+        <h3 class="sora" style="font-size:15px;font-weight:600;margin-bottom:6px">Desglose de tu estimación</h3>
+        <p class="muted" style="font-size:12.5px;margin-bottom:18px" id="desglose-sub">Cuéntale tu síntoma a la IA para ver el detalle.</p>
+        <div id="desglose" style="display:flex;flex-direction:column">
+          <div class="muted" style="font-size:13.5px;line-height:1.6;padding:8px 0">Cuando la IA identifique tu especialista, aquí verás la especialidad, el hospital recomendado, el porcentaje que cubre tu seguro y tu copago final.</div>
         </div>
       </div>
 
-      <!-- RIGHT column -->
-      <div style="display:flex;flex-direction:column;gap:20px">
-
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 class="sora" style="font-size:15px;font-weight:600">Hospitales de tu red</h3></div>
-          <p class="muted" style="font-size:12.5px;margin-bottom:18px" id="comparacion-sub">Copago estimado en cada hospital (<?= $h($ciudadActual) ?>)</p>
-          <div id="comparacion" style="display:flex;flex-direction:column;gap:16px">
-            <div class="muted" style="font-size:13.5px;line-height:1.6">Aún sin datos. La comparación aparece cuando la IA calcula tu copago.</div>
-          </div>
+      <!-- Hospitales de tu red -->
+      <div class="card">
+        <span class="eyebrow">Comparativa</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 class="sora" style="font-size:15px;font-weight:600">Hospitales de tu red</h3></div>
+        <p class="muted" style="font-size:12.5px;margin-bottom:18px" id="comparacion-sub">Copago estimado en cada hospital (<?= $h($ciudadActual) ?>)</p>
+        <div id="comparacion" style="display:flex;flex-direction:column;gap:16px">
+          <div class="muted" style="font-size:13.5px;line-height:1.6">Aún sin datos. La comparación aparece cuando la IA calcula tu copago.</div>
         </div>
+      </div>
 
-        <!-- CHAT -->
-        <div style="background:#10231f;border-radius:20px;padding:22px;color:#e3efe9;display:flex;flex-direction:column;gap:14px;flex:1">
-          <div style="display:flex;gap:10px;align-items:center">
-            <div style="width:32px;height:32px;border-radius:9px;background:#2fbf71;display:flex;align-items:center;justify-content:center;font-size:16px">✦</div>
-            <div><div class="sora" style="font-weight:600;font-size:14px;color:#fff">Clara · Asistente IA</div><div style="font-size:11.5px;color:#7fa494">Te dice tu especialista y tu copago</div></div>
-          </div>
+    </div>
 
-          <div id="chat-log" role="log" aria-live="polite" aria-label="Conversación con Clara, asistente de salud"
-               style="display:flex;flex-direction:column;gap:12px;flex:1;overflow-y:auto;max-height:300px">
-            <!-- las burbujas se agregan por JS -->
-          </div>
-
-          <div style="display:flex;gap:7px;flex-wrap:wrap" id="sugerencias">
-            <button class="chip" onclick="preguntar('Tengo dolor en el pecho')">Dolor en el pecho</button>
-            <button class="chip" onclick="preguntar('A mi bebé le dio fiebre')">Fiebre de mi bebé</button>
-            <button class="chip" onclick="preguntar('Me lastimé el tobillo')">Me lastimé el tobillo</button>
-          </div>
-
-          <div style="display:flex;align-items:center;gap:9px;background:#fff;border-radius:13px;padding:6px 6px 6px 15px">
-            <input id="chat-input" aria-label="Escribe tu síntoma o molestia" placeholder="Cuéntame cómo te sientes…" style="border:none;outline:none;flex:1;font-size:13.5px;color:#10231f;background:transparent" onkeydown="if(event.key==='Enter')enviar()">
-            <button id="send-btn" onclick="enviar()" aria-label="Enviar mensaje a Clara" style="background:#2fbf71;border:none;width:36px;height:36px;border-radius:10px;color:#053023;font-size:17px;cursor:pointer">↑</button>
-          </div>
-        </div>
+    <!-- Qué significa esto (ancho completo, 3 columnas responsivas) -->
+    <div class="card">
+      <span class="eyebrow">En simple</span>
+      <h3 class="sora" style="font-size:15px;font-weight:600;margin-bottom:16px">Qué significa esto</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px">
+        <div style="display:flex;gap:12px;align-items:flex-start"><span style="width:22px;height:22px;border-radius:50%;background:#e2f6ec;color:#128a4e;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">✓</span><span style="font-size:13.5px;line-height:1.55;color:#334741">El <b>copago</b> es lo único que pagas tú; el resto lo cubre tu seguro según tu plan.</span></div>
+        <div style="display:flex;gap:12px;align-items:flex-start"><span style="width:22px;height:22px;border-radius:50%;background:#e2f6ec;color:#128a4e;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">✓</span><span style="font-size:13.5px;line-height:1.55;color:#334741">Comparamos los <b>hospitales de tu red</b> en tu ciudad y te mostramos el más económico.</span></div>
+        <div style="display:flex;gap:12px;align-items:flex-start"><span style="width:22px;height:22px;border-radius:50%;background:#e2f6ec;color:#128a4e;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">✓</span><span style="font-size:13.5px;line-height:1.55;color:#334741">Los montos salen de <b>tu póliza real</b>, no son inventados por la IA.</span></div>
       </div>
     </div>
   </main>
+</div>
+
+<!-- ===== CHAT FLOTANTE: Clara siempre accesible con un botón ===== -->
+<button id="chatFab" onclick="abrirChat()" aria-label="Abrir chat con Clara">
+  <span class="ic">✦</span><span class="label">Preguntar a Clara</span>
+</button>
+<div id="chatDock" class="chat-dock" role="dialog" aria-label="Chat con Clara">
+  <div class="chat-dock-head">
+    <div style="width:32px;height:32px;border-radius:9px;background:#2fbf71;display:flex;align-items:center;justify-content:center;font-size:16px">✦</div>
+    <div><div class="sora" style="font-weight:600;font-size:14px;color:#fff">Clara · Asistente IA</div><div style="font-size:11.5px;color:#7fa494">Te dice tu especialista y tu copago</div></div>
+    <button class="x" onclick="cerrarChat()" aria-label="Cerrar chat">×</button>
+  </div>
+  <div id="chat-log" role="log" aria-live="polite" aria-label="Conversación con Clara, asistente de salud">
+    <!-- las burbujas se agregan por JS -->
+  </div>
+  <div class="sugs" id="sugerencias">
+    <button class="chip" onclick="preguntar('Tengo dolor en el pecho')">Dolor en el pecho</button>
+    <button class="chip" onclick="preguntar('A mi bebé le dio fiebre')">Fiebre de mi bebé</button>
+    <button class="chip" onclick="preguntar('Me lastimé el tobillo')">Me lastimé el tobillo</button>
+  </div>
+  <div class="inrow">
+    <input id="chat-input" aria-label="Escribe tu síntoma o molestia" placeholder="Cuéntame cómo te sientes…" style="border:none;outline:none;flex:1;font-size:13.5px;color:#10231f;background:transparent" onkeydown="if(event.key==='Enter')enviar()">
+    <button id="send-btn" onclick="enviar()" aria-label="Enviar mensaje a Clara" style="background:#2fbf71;border:none;width:36px;height:36px;border-radius:10px;color:#053023;font-size:17px;cursor:pointer">↑</button>
+  </div>
 </div>
 
 <script>
@@ -286,6 +369,21 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
   function toggleMenu(){ document.getElementById('app').classList.toggle('collapsed'); }
   // En móvil, cierra el panel lateral tras elegir una opción del menú
   function cerrarMenuMovil(){ if(window.innerWidth <= 960){ document.getElementById('app').classList.remove('collapsed'); } }
+
+  // Chat flotante de Clara: abrir / cerrar (accesible desde el botón permanente)
+  function abrirChat(){
+    document.getElementById('chatDock').classList.add('open');
+    document.getElementById('chatFab').style.display = 'none';
+    var t = document.getElementById('btn-tema'); if(t) t.style.display = 'none';  // no tapar el chat
+    var log = document.getElementById('chat-log');
+    if(log) log.scrollTop = log.scrollHeight;
+    setTimeout(function(){ var i = document.getElementById('chat-input'); if(i) i.focus(); }, 60);
+  }
+  function cerrarChat(){
+    document.getElementById('chatDock').classList.remove('open');
+    document.getElementById('chatFab').style.display = '';
+    var t = document.getElementById('btn-tema'); if(t) t.style.display = '';
+  }
 
   // Cambiar la ciudad de atención: guarda en sesión, reinicia la conversación y recalcula
   let ciudadActual = <?= json_encode($ciudadActual) ?>;

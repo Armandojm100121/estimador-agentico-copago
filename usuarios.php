@@ -95,7 +95,14 @@ $fecha = function (?string $ymd): string {
   a{color:var(--marca);text-decoration:none}
   .sora{font-family:'Sora',sans-serif}
   .wrap{max-width:1000px;margin:0 auto}
-  .card{background:var(--surface);border:1px solid var(--borde);border-radius:16px;padding:20px 22px;color:var(--text)}
+  .card{background:var(--surface);border:1px solid var(--borde);border-radius:16px;padding:20px 22px;color:var(--text);box-shadow:0 18px 44px -34px rgba(16,35,31,.4);transition:box-shadow .3s var(--ease-spring)}
+  .card:hover{box-shadow:0 26px 60px -38px rgba(16,35,31,.5)}
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  .card{animation:rise .55s var(--ease-spring) both}
+  .card:nth-child(1){animation-delay:.03s}
+  .card:nth-child(2){animation-delay:.08s}
+  .card:nth-child(3){animation-delay:.13s}
+  .card:nth-child(4){animation-delay:.18s}
   .muted{color:var(--muted);font-size:12.5px}
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
   .kpi .n{font-family:'Sora',sans-serif;font-weight:800;font-size:30px;margin-top:6px}
@@ -105,9 +112,11 @@ $fecha = function (?string $ymd): string {
   .row .bar{flex:1;height:12px;background:var(--surface-2);border-radius:6px;overflow:hidden}
   .row .bar>div{height:100%;border-radius:6px;background:#0f5c5c}
   .row .val{width:34px;text-align:right;font-weight:600;font-size:13px}
-  .btn{background:var(--marca);color:#fff;font-size:13.5px;font-weight:600;padding:10px 16px;border-radius:11px;border:none;cursor:pointer;display:inline-flex;gap:7px;align-items:center;text-decoration:none}
+  .btn{background:linear-gradient(180deg,var(--marca-2),var(--marca));color:#fff;font-size:13.5px;font-weight:600;padding:10px 16px;border-radius:11px;border:none;cursor:pointer;display:inline-flex;gap:7px;align-items:center;text-decoration:none;box-shadow:0 10px 22px -14px rgba(15,92,92,.7),inset 0 1px 0 rgba(255,255,255,.14)}
+  .btn:hover{filter:brightness(1.06);transform:translateY(-1px)}
+  .btn:active{transform:scale(.97)}
   .btn-ghost{background:var(--surface);border:1px solid var(--field-border);color:var(--text);font-size:13.5px;font-weight:500;padding:10px 16px;border-radius:11px;cursor:pointer;display:inline-flex;gap:7px;align-items:center;text-decoration:none}
-  .btn-ghost:hover{border-color:var(--marca);color:var(--marca)}
+  .btn-ghost:hover{border-color:var(--marca);color:var(--marca);transform:translateY(-1px)}
   table{width:100%;border-collapse:collapse;font-size:13.5px}
   th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--borde)}
   th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600}

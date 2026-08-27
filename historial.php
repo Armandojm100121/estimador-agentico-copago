@@ -59,10 +59,18 @@ $money = fn($n) => '$' . number_format((float)$n, 2);
   a{color:var(--marca);text-decoration:none}
   .sora{font-family:'Sora',sans-serif}
   .wrap{max-width:900px;margin:0 auto}
-  .card{background:var(--surface);border:1px solid var(--borde);border-radius:18px;padding:22px 24px;color:var(--text)}
+  .card{background:var(--surface);border:1px solid var(--borde);border-radius:18px;padding:22px 24px;color:var(--text);box-shadow:0 18px 44px -34px rgba(16,35,31,.4);transition:box-shadow .3s var(--ease-spring)}
+  .card:hover{box-shadow:0 26px 60px -38px rgba(16,35,31,.5)}
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  .card{animation:rise .55s var(--ease-spring) both}
+  .card:nth-child(1){animation-delay:.03s}
+  .card:nth-child(2){animation-delay:.08s}
+  .card:nth-child(3){animation-delay:.13s}
+  .card:nth-child(4){animation-delay:.18s}
   .chip{display:inline-block;font-size:11.5px;background:var(--surface-2);color:var(--muted);padding:4px 10px;border-radius:8px;font-weight:500}
   .btn-ghost{background:var(--surface);border:1px solid var(--field-border);color:var(--text);font-size:13.5px;font-weight:500;padding:10px 16px;border-radius:11px;cursor:pointer;display:inline-flex;align-items:center;gap:7px}
-  .btn-ghost:hover{border-color:var(--marca);color:var(--marca)}
+  .btn-ghost:hover{border-color:var(--marca);color:var(--marca);transform:translateY(-1px)}
+  .btn-ghost:active{transform:scale(.97)}
   .badge-auth{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:8px}
   @media(max-width:560px){body{padding:14px 10px}.card{padding:18px}}
 </style>
