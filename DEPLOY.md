@@ -28,6 +28,7 @@ archivos locales. Así el mismo archivo sirve en los dos entornos.
 | `MAIL_FROM_NAME` | No | Nombre que aparece como remitente | `config.php` |
 | `APP_URL` | No | URL pública (enlaces de los correos) | `config.php` |
 | `PORT` | Auto | Puerto del servidor (lo inyecta Railway) | `Dockerfile` |
+| `PHP_CLI_SERVER_WORKERS` | No | Peticiones simultáneas que atiende el servidor PHP (por defecto 4, fijado en el `Dockerfile`) | `Dockerfile` |
 
 \* Si no defines las de correo, la app funciona en **modo demo** (muestra el enlace
 de recuperación/verificación en pantalla en vez de enviarlo). Ver `CORREO.md`.

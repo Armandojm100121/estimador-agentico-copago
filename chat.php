@@ -328,32 +328,22 @@ try {
         $choiceArg = 'auto';
     }
 
-    // 6) Primera llamada al modelo, con reintentos escalonados ante el error 400 de
-    //    function calling de Groq ("Failed to call a function"):
-    //      1º intento: como corresponda al turno (forzado o auto).
-    //      2º intento: en modo 'auto' (por si falló la llamada FORZADA).
-    //      3º intento: SIN herramientas, para que Clara responda al menos en texto
-    //                  y el paciente nunca vea un error crudo.
+    // 6) Primera llamada al modelo. Se envía el historial RECORTADO (ver
+    //    recortarHistorial en llm.php) para no agotar el límite de tokens por
+    //    minuto del plan gratis de Groq. Ante el error 400 de function calling
+    //    ("Failed to call a function") hay UN solo reintento, sin herramientas:
+    //    Clara responde al menos en texto y el paciente nunca ve un error crudo.
+    //    (Antes había una cascada de hasta 3 llamadas con herramientas, que en un
+    //    solo turno podía gastar más tokens de los que permite el plan por minuto.)
     try {
-        $resp = openaiChat($_SESSION['messages'], $toolsArg, $choiceArg);
+        $resp = openaiChat(recortarHistorial($_SESSION['messages']), $toolsArg, $choiceArg);
     } catch (GroqRateLimitException $e) {
         // Límite por minuto: reintentar gastaría MÁS tokens y empeoraría. Propaga
         // directo para avisar al paciente que espere unos segundos.
         throw $e;
     } catch (Throwable $e) {
-        try {
-            if ($choiceArg !== 'auto') {
-                $resp = openaiChat($_SESSION['messages'], $toolsArg, 'auto');
-            } else {
-                throw $e;
-            }
-        } catch (GroqRateLimitException $e2) {
-            throw $e2;
-        } catch (Throwable $e2) {
-            // Último recurso: sin herramientas. El modelo no podrá calcular el copago
-            // en este turno, pero mantiene la conversación viva sin romperse.
-            $resp = openaiChat($_SESSION['messages'], [], 'auto');
-        }
+        error_log('[chat.php] primera llamada fallo, reintento sin herramientas: ' . $e->getMessage());
+        $resp = openaiChat(recortarHistorial($_SESSION['messages']), [], 'auto');
     }
     $choice = $resp['choices'][0]['message'];
     $_SESSION['messages'][] = $choice;
@@ -440,7 +430,18 @@ try {
             $datos = null;
         } else {
             // Segunda llamada: el modelo redacta la respuesta final con los datos reales.
-            $resp2  = openaiChat($_SESSION['messages'], $tools);
+            // Aquí solo tiene que escribir UNA frase, así que NO se reenvían las
+            // definiciones de herramientas (unos 2.000 tokens menos por turno).
+            // Si Groq rechazara el historial con tool_calls sin herramientas, se
+            // reintenta una vez con ellas para no romper la conversación.
+            try {
+                $resp2 = openaiChat(recortarHistorial($_SESSION['messages']), []);
+            } catch (GroqRateLimitException $e) {
+                throw $e;
+            } catch (Throwable $e) {
+                error_log('[chat.php] respuesta final sin herramientas fallo, reintento con ellas: ' . $e->getMessage());
+                $resp2 = openaiChat(recortarHistorial($_SESSION['messages']), $tools);
+            }
             $choice = $resp2['choices'][0]['message'];
             $_SESSION['messages'][] = $choice;
         }

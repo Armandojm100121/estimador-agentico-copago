@@ -17,6 +17,33 @@ class GroqRateLimitException extends GroqException {
     }
 }
 
+// Recorta el historial que se ENVÍA al modelo (no el guardado en sesión): conserva el
+// mensaje de sistema y solo los últimos $maxTurnos turnos del paciente, con las
+// respuestas y resultados de herramienta que les siguen. Cada llamada a Groq cobra
+// el historial completo, y el plan gratis admite 8.000 tokens por minuto, así que un
+// historial sin recorte agota el límite en pocos turnos. El corte siempre empieza en
+// un mensaje 'user', así nunca queda un resultado 'tool' sin su llamada previa.
+function recortarHistorial(array $messages, int $maxTurnos = 4): array {
+    if (count($messages) < 2) {
+        return $messages;
+    }
+    $sistema = ($messages[0]['role'] ?? '') === 'system' ? [$messages[0]] : [];
+    $resto   = $sistema ? array_slice($messages, 1) : $messages;
+
+    $inicio = 0;
+    $vistos = 0;
+    for ($i = count($resto) - 1; $i >= 0; $i--) {
+        if (($resto[$i]['role'] ?? '') === 'user') {
+            $vistos++;
+            if ($vistos === $maxTurnos) {
+                $inicio = $i;
+                break;
+            }
+        }
+    }
+    return array_merge($sistema, array_slice($resto, $inicio));
+}
+
 function openaiChat(array $messages, array $tools = [], $toolChoice = 'auto', ?string $model = null): array {
     if (!OPENAI_API_KEY) {
         throw new RuntimeException('Falta la API key. Edita config.local.php.');
