@@ -248,7 +248,10 @@ $h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
         <div class="stat"><div class="sora" style="font-size:24px;font-weight:800;color:#7ff0b3">12+</div><div style="font-size:12px;color:#7fa494;margin-top:2px">aseguradoras en Ecuador</div></div>
       </div>
     </div>
-    <div style="position:relative;font-size:12.5px;color:#5f7a70">Tus datos de salud se mantienen privados y cifrados.</div>
+    <div style="position:relative;font-size:12.5px;color:#5f7a70">
+      <div style="color:#7fa494">Prototipo académico — caso de estudio: red VERIS, Guayaquil · Datos de demostración</div>
+      <div style="margin-top:5px">Tus datos de salud se mantienen privados y cifrados.</div>
+    </div>
   </div>
 
   <!-- FORM SIDE -->
