@@ -241,6 +241,26 @@ try {
                 ],
             ],
         ],
+        [
+            // Pide ACLARACIÓN cuando la respuesta del paciente es ININTELIGIBLE o no
+            // responde a la pregunta (texto al azar, una palabra sin sentido). Evita
+            // que el agente "adivine" y estime sobre una respuesta basura.
+            'type' => 'function',
+            'function' => [
+                'name' => 'pedir_aclaracion',
+                'description' => 'Úsala cuando la respuesta del paciente es ininteligible, parece un error de tecleo o NO responde a tu pregunta (por ejemplo "heuvo", "asdf", letras al azar, una palabra suelta sin sentido). En ese caso NO adivines ni estimes: hay que pedir amablemente que lo repita o lo explique mejor.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'motivo' => [
+                            'type' => 'string',
+                            'description' => 'Qué fue lo que no se entendió (opcional).',
+                        ],
+                    ],
+                    'required' => [],
+                ],
+            ],
+        ],
     ];
 
     // 4) Validar que el paciente eligió su plan en la pantalla de bienvenida
@@ -276,8 +296,11 @@ try {
                 "2) SEGUNDO mensaje (el paciente ya respondió tu pregunta): NO hagas más preguntas. " .
                 "Deduce la especialidad y llama INMEDIATAMENTE a la herramienta buscar_copago con esa " .
                 "especialidad (el plan y la ciudad ya los conoce el sistema). Aunque la info sea " .
-                "incompleta, igual llámala. Excepción: si ese mensaje NO es un síntoma de salud, " .
-                "llama a fuera_de_tema en lugar de buscar_copago.\n" .
+                "incompleta, igual llámala. DOS excepciones: (a) si ese mensaje NO es un síntoma de " .
+                "salud (insultos, bromas, temas ajenos), llama a fuera_de_tema; (b) si la respuesta es " .
+                "ININTELIGIBLE o no responde a tu pregunta (texto al azar o una palabra sin sentido como " .
+                "'heuvo', 'asdf', 'jajaja'), NO adivines ni estimes: llama a pedir_aclaracion para que el " .
+                "paciente lo repita.\n" .
                 "3) Al presentar el resultado: UNA frase corta indicando la especialidad sugerida. " .
                 "NO repitas montos ni hospitales en el texto (se muestran en una tarjeta aparte). " .
                 "Si el resultado de la herramienta trae requiere_autorizacion=true, agrega una segunda " .
@@ -317,11 +340,12 @@ try {
         $toolsArg  = [];
         $choiceArg = 'auto';
     } elseif ($userTurns === 2) {
-        // El modelo DEBE elegir una herramienta, pero solo entre estimar (buscar_copago)
-        // o declarar que el mensaje no es de salud (fuera_de_tema). Así no inventa una
-        // especialidad ante mensajes sin sentido o ajenos a la salud.
+        // El modelo DEBE elegir UNA de tres: estimar (buscar_copago), declarar que el
+        // mensaje no es de salud (fuera_de_tema) o pedir aclaración si la respuesta fue
+        // ininteligible (pedir_aclaracion). Así no inventa una especialidad ni adivina
+        // sobre una respuesta basura.
         $toolsArg  = array_values(array_filter($tools, fn($t) =>
-            in_array($t['function']['name'], ['buscar_copago', 'fuera_de_tema'], true)));
+            in_array($t['function']['name'], ['buscar_copago', 'fuera_de_tema', 'pedir_aclaracion'], true)));
         $choiceArg = 'required';
     } else {
         $toolsArg  = $tools;
@@ -349,7 +373,8 @@ try {
     $_SESSION['messages'][] = $choice;
 
     $datos = null;
-    $fueraDeTema = false;   // se activa si el paciente escribió algo que no es de salud
+    $fueraDeTema = false;      // se activa si el paciente escribió algo que no es de salud
+    $pedirAclaracion = false;  // se activa si la respuesta del paciente fue ininteligible
 
     // 7) ¿El modelo usó alguna herramienta? El agente decide CUÁL según lo que pidió
     //    el paciente. Aquí despachamos cada llamada al manejador correspondiente.
@@ -393,6 +418,12 @@ try {
                     $fueraDeTema  = true;
                     break;
 
+                case 'pedir_aclaracion':
+                    // La respuesta del paciente fue ininteligible: pedimos que la repita.
+                    $resultado       = ['tipo' => 'aclaracion'];
+                    $pedirAclaracion = true;
+                    break;
+
                 case 'buscar_copago':
                 default:
                     $resultado = buscarCopago($db, $args['especialidad'] ?? '', $planSel, $planes,
@@ -426,6 +457,13 @@ try {
             $choice = ['role' => 'assistant', 'content' =>
                 'Puedo ayudarte solo con molestias o síntomas de salud, para estimar tu copago '
               . 'y orientarte sobre a qué especialista acudir. Cuéntame qué sientes 🙂'];
+            $_SESSION['messages'][] = $choice;
+            $datos = null;
+        } elseif ($pedirAclaracion) {
+            // La respuesta fue ininteligible: pedimos que la repita en vez de adivinar.
+            $choice = ['role' => 'assistant', 'content' =>
+                'Perdona, no te entendí bien 🤔. ¿Me lo cuentas de nuevo con otras palabras '
+              . 'para poder ayudarte?'];
             $_SESSION['messages'][] = $choice;
             $datos = null;
         } else {
