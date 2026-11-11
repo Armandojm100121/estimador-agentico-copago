@@ -1,16 +1,38 @@
 <?php
-// config.php  -  Configuración del LLM (seguro para subir a Git)
-// Usamos Groq (API compatible con OpenAI). La key se lee desde:
-//   1) variable de entorno GROQ_API_KEY    (producción / despliegue)
-//   2) config.local.php                     (desarrollo en XAMPP, va en .gitignore)
+// config.php  -  Configuración del LLM (seguro para subir a Git; sin claves)
+// Proveedor CONMUTABLE: Claude (Anthropic) o Groq (compatible con OpenAI).
+// Claves y proveedor se leen en este orden:
+//   1) variables de entorno  ANTHROPIC_API_KEY / GROQ_API_KEY / LLM_PROVIDER  (producción)
+//   2) config.local.php  ->  ['provider'=>..., 'claude'=>..., 'groq'=>...]     (desarrollo, .gitignore)
 
-$key = getenv('GROQ_API_KEY');
-if (!$key && file_exists(__DIR__ . '/config.local.php')) {
-    $key = require __DIR__ . '/config.local.php';
+$anthropicKey = getenv('ANTHROPIC_API_KEY') ?: '';
+$groqKey      = getenv('GROQ_API_KEY') ?: '';
+$provider     = getenv('LLM_PROVIDER') ?: '';
+
+if (file_exists(__DIR__ . '/config.local.php')) {
+    $local = require __DIR__ . '/config.local.php';
+    if (is_array($local)) {
+        $anthropicKey = $anthropicKey ?: ($local['claude'] ?? $local['anthropic'] ?? '');
+        $groqKey      = $groqKey      ?: ($local['groq'] ?? '');
+        $provider     = $provider     ?: ($local['provider'] ?? '');
+    } else {
+        // Compatibilidad hacia atrás: si config.local.php devuelve un string, es la key de Groq.
+        $groqKey = $groqKey ?: (string) $local;
+    }
 }
 
-define('OPENAI_API_KEY', $key ?: '');                  // nombre histórico — guarda la key de Groq
-define('OPENAI_MODEL', 'openai/gpt-oss-20b');          // modelo de Groq con tool calling; el 20B gasta menos tokens (mejor para el limite gratis). Llama 3.x fue retirado por Groq.
+// Proveedor por defecto: Claude si hay key de Claude; si no, Groq.
+if ($provider === '') { $provider = $anthropicKey ? 'claude' : 'groq'; }
+define('LLM_PROVIDER', $provider);
+
+// --- Claude (Anthropic) ---  La plata sale del SQL; el modelo solo razona y decide.
+define('ANTHROPIC_API_KEY', $anthropicKey);
+define('ANTHROPIC_MODEL',   getenv('ANTHROPIC_MODEL') ?: 'claude-haiku-5-5');  // el más barato; suficiente para estimar copagos
+define('ANTHROPIC_VERSION', '2026-10-21');
+
+// --- Groq (compatible con OpenAI) ---  nombres históricos, usados por el camino Groq.
+define('OPENAI_API_KEY', $groqKey ?: '');
+define('OPENAI_MODEL',   getenv('GROQ_MODEL') ?: 'openai/gpt-oss-20b');
 
 // ---------------------------------------------------------------------------
 // Correo transaccional (recuperación de contraseña / verificación) — #15

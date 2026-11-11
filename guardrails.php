@@ -103,6 +103,12 @@ function gr_neutralizar_montos(string $texto): array {
     if ($hubo) {
         // Limpieza cosmética de dobles espacios que deje el reemplazo.
         $limpio = trim(preg_replace('/\s{2,}/u', ' ', $limpio));
+        // Arreglo de la contracción española: "de el monto..." -> "del monto..."
+        // (el reemplazo deja "de el" cuando el modelo escribió "de $12").
+        $limpio = strtr($limpio, [
+            'De el monto que ves' => 'Del monto que ves',
+            'de el monto que ves' => 'del monto que ves',
+        ]);
         if ($limpio === '') {
             $limpio = 'Te muestro la especialidad sugerida y tu copago en la tarjeta.';
         }
