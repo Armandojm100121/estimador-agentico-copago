@@ -154,6 +154,7 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
   .chat-dock-head{display:flex;gap:10px;align-items:center;padding:16px 16px 12px;border-bottom:1px solid #1c332d}
   .chat-dock-head .x{margin-left:auto;background:transparent;border:none;color:#7fa494;font-size:22px;line-height:1;cursor:pointer;width:32px;height:32px;border-radius:8px}
   .chat-dock-head .x:hover{background:#1c332d;color:#fff}
+  .chat-dock-head .x + .x{margin-left:4px}  /* el 2º botón no debe repartirse el espacio del margin auto */
   .chat-dock #chat-log{max-height:none!important;flex:1 1 auto;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px}
   .chat-dock .sugs{display:flex;gap:7px;flex-wrap:wrap;padding:2px 16px 8px}
   .chat-dock .inrow{display:flex;align-items:center;gap:9px;background:#fff;border-radius:13px;padding:6px 6px 6px 15px;margin:0 16px 16px}
@@ -359,6 +360,7 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
   <div class="chat-dock-head">
     <div style="width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#0f5c5c,#12786b);display:flex;align-items:center;justify-content:center;font-size:16px">✦</div>
     <div><div class="sora" style="font-weight:600;font-size:14px;color:#fff">Clara · Asistente IA</div><div style="font-size:11.5px;color:#7fa494">Te dice tu especialista y tu copago</div></div>
+    <button class="x" onclick="reiniciar()" aria-label="Nueva consulta" title="Nueva consulta" style="font-size:16px">↺</button>
     <button class="x" onclick="cerrarChat()" aria-label="Cerrar chat">×</button>
   </div>
   <div id="chat-log" role="log" aria-live="polite" aria-label="Conversación con Clara, asistente de salud">
@@ -863,8 +865,10 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
 
   async function reiniciar(){
     try { await fetch(API + '?reset=1'); } catch(e){}
+    resetResultado();   // limpia tarjetas, desglose, comparación y avisos (igual que al cambiar de ciudad)
     log.innerHTML = '';
     bubble('Listo, empecemos de nuevo. Cuéntame qué síntoma tienes.', false);
+    abrirChat();        // si el chat estaba cerrado, que Clara aparezca lista para la nueva consulta
   }
 
   // #13 · Accesibilidad por teclado: los ítems del menú son <div> con onclick.
