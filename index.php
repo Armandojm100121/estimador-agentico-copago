@@ -636,6 +636,7 @@ $verifyDemoLink = $_SESSION['verify_demo_link'] ?? '';
       'G1_mensaje_recortado':               'Se recortó tu mensaje por seguridad (largo máximo).',
       'G2_especialidad_invalida':           'La IA propuso una especialidad inexistente y el sistema la rechazó.',
       'G3_monto_alucinado_neutralizado':    'La IA intentó dar un monto y el sistema lo bloqueó: los valores solo salen de tu póliza (SQL).',
+      'C_nuevo_sintoma_detectado':          'Detecté que cambiaste de síntoma: reinicié la consulta para evaluar el nuevo desde cero.',
     };
     codigos.forEach(c => {
       const n = document.createElement('div');

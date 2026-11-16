@@ -22,7 +22,7 @@ $guardrailsActivos = [];
 
 if (isset($_GET['reset'])) {
     // Solo reinicia la conversación; conserva el login y el plan del usuario.
-    unset($_SESSION['messages']);
+    unset($_SESSION['messages'], $_SESSION['consulta_inicio'], $_SESSION['sintoma_inicial']);
     echo json_encode(['ok' => true, 'msg' => 'Conversación reiniciada']);
     exit;
 }
@@ -68,7 +68,7 @@ if (isset($_GET['set_ciudad'])) {
             throw new RuntimeException('Ciudad no válida.');
         }
         $_SESSION['ciudad'] = $ciudad;
-        unset($_SESSION['messages']);
+        unset($_SESSION['messages'], $_SESSION['consulta_inicio'], $_SESSION['sintoma_inicial']);
         echo json_encode(['ok' => true, 'ciudad' => $ciudad], JSON_UNESCAPED_UNICODE);
         exit;
     } catch (Throwable $e) {
@@ -242,6 +242,27 @@ try {
             ],
         ],
         [
+            // Detecta CAMBIO de motivo de consulta: el paciente, en vez de responder
+            // la pregunta de Clara, trae un síntoma distinto (o consulta por otra
+            // persona). Reinicia la consulta para que el síntoma viejo no contamine
+            // el triaje, la estimación ni el historial.
+            'type' => 'function',
+            'function' => [
+                'name' => 'nuevo_sintoma',
+                'description' => 'Úsala cuando el paciente, en lugar de responder tu pregunta, menciona un síntoma DIFERENTE al que venía contando o una consulta para OTRA persona (por ejemplo: preguntaste por su dolor de pecho y ahora dice que a su bebé le dio fiebre). NO estimes con el síntoma viejo ni mezcles los dos: esta herramienta reinicia la consulta con el síntoma nuevo.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'sintoma' => [
+                            'type' => 'string',
+                            'description' => 'El síntoma nuevo que mencionó el paciente (opcional).',
+                        ],
+                    ],
+                    'required' => [],
+                ],
+            ],
+        ],
+        [
             // Pide ACLARACIÓN cuando la respuesta del paciente es ININTELIGIBLE o no
             // responde a la pregunta (texto al azar, una palabra sin sentido). Evita
             // que el agente "adivine" y estime sobre una respuesta basura.
@@ -296,11 +317,14 @@ try {
                 "2) SEGUNDO mensaje (el paciente ya respondió tu pregunta): NO hagas más preguntas. " .
                 "Deduce la especialidad y llama INMEDIATAMENTE a la herramienta buscar_copago con esa " .
                 "especialidad (el plan y la ciudad ya los conoce el sistema). Aunque la info sea " .
-                "incompleta, igual llámala. DOS excepciones: (a) si ese mensaje NO es un síntoma de " .
+                "incompleta, igual llámala. TRES excepciones: (a) si ese mensaje NO es un síntoma de " .
                 "salud (insultos, bromas, temas ajenos), llama a fuera_de_tema; (b) si la respuesta es " .
                 "ININTELIGIBLE o no responde a tu pregunta (texto al azar o una palabra sin sentido como " .
                 "'heuvo', 'asdf', 'jajaja'), NO adivines ni estimes: llama a pedir_aclaracion para que el " .
-                "paciente lo repita.\n" .
+                "paciente lo repita; (c) si en vez de responder menciona un síntoma DISTINTO al que venía " .
+                "contando o una consulta para OTRA persona (p. ej. preguntaste por su dolor de pecho y " .
+                "ahora habla de la fiebre de su bebé), NO mezcles los dos síntomas: llama a nuevo_sintoma " .
+                "para reiniciar la consulta con el síntoma nuevo.\n" .
                 "3) Al presentar el resultado: UNA frase corta indicando la especialidad sugerida. " .
                 "NO repitas montos ni hospitales en el texto (se muestran en una tarjeta aparte). " .
                 "Si el resultado de la herramienta trae requiere_autorizacion=true, agrega una segunda " .
@@ -316,6 +340,7 @@ try {
                 "   • Si pregunta qué plan le conviene contratar o cuál es más barato -> llama comparar_planes.\n" .
                 "   • Si pregunta por qué paga ese valor, cómo se calcula o qué cubre su plan -> llama explicar_cobertura.\n" .
                 "   • Si pregunta cuánto sería en OTRA ciudad -> llama buscar_por_ciudad con esa ciudad.\n" .
+                "   • Si en cualquier momento trae un síntoma NUEVO distinto (u otra persona enferma) -> llama nuevo_sintoma.\n" .
                 "   Tras cualquiera de estas, responde con UNA frase breve; los detalles se muestran en una tarjeta aparte. " .
                 "Nunca inventes montos: úsalos solo desde las herramientas.",
         ]];
@@ -326,9 +351,13 @@ try {
     //    Turno 1  -> SIN herramientas: el modelo se ve obligado a hacer UNA pregunta.
     //    Turno 2  -> herramienta FORZADA: muestra el copago de inmediato.
     //    Turno 3+ -> herramienta automática: conversación libre.
+    //    El conteo arranca en $_SESSION['consulta_inicio']: cuando Clara detecta un
+    //    CAMBIO de síntoma (herramienta nuevo_sintoma), esa marca avanza y la
+    //    consulta nueva vuelve a empezar su propio ciclo de turnos.
+    $inicioConsulta = $_SESSION['consulta_inicio'] ?? 0;
     $userTurns = 0;
-    foreach ($_SESSION['messages'] as $m) {
-        if (($m['role'] ?? '') === 'user') {
+    foreach ($_SESSION['messages'] as $i => $m) {
+        if ($i >= $inicioConsulta && ($m['role'] ?? '') === 'user') {
             $userTurns++;
         }
     }
@@ -340,12 +369,13 @@ try {
         $toolsArg  = [];
         $choiceArg = 'auto';
     } elseif ($userTurns === 2) {
-        // El modelo DEBE elegir UNA de tres: estimar (buscar_copago), declarar que el
-        // mensaje no es de salud (fuera_de_tema) o pedir aclaración si la respuesta fue
-        // ininteligible (pedir_aclaracion). Así no inventa una especialidad ni adivina
-        // sobre una respuesta basura.
+        // El modelo DEBE elegir UNA de cuatro: estimar (buscar_copago), declarar que el
+        // mensaje no es de salud (fuera_de_tema), pedir aclaración si la respuesta fue
+        // ininteligible (pedir_aclaracion) o reiniciar si el paciente cambió de síntoma
+        // (nuevo_sintoma). Así no inventa una especialidad, no adivina sobre una
+        // respuesta basura ni estima mezclando el síntoma viejo con el nuevo.
         $toolsArg  = array_values(array_filter($tools, fn($t) =>
-            in_array($t['function']['name'], ['buscar_copago', 'fuera_de_tema', 'pedir_aclaracion'], true)));
+            in_array($t['function']['name'], ['buscar_copago', 'fuera_de_tema', 'pedir_aclaracion', 'nuevo_sintoma'], true)));
         $choiceArg = 'required';
     } else {
         $toolsArg  = $tools;
@@ -375,16 +405,18 @@ try {
     $datos = null;
     $fueraDeTema = false;      // se activa si el paciente escribió algo que no es de salud
     $pedirAclaracion = false;  // se activa si la respuesta del paciente fue ininteligible
+    $cambioSintoma = false;    // se activa si el paciente cambió de motivo de consulta
 
     // 7) ¿El modelo usó alguna herramienta? El agente decide CUÁL según lo que pidió
     //    el paciente. Aquí despachamos cada llamada al manejador correspondiente.
     // Texto que alimenta la red de seguridad del triaje (#6). IMPORTANTE: solo los
-    // ÚLTIMOS 2 mensajes del paciente (la consulta actual), NO todo el historial.
-    // Así una molestia vieja (p. ej. "dolor en el pecho" preguntado antes) no
-    // contamina ni escala por error una consulta nueva y distinta (p. ej. fiebre).
+    // últimos 2 mensajes del paciente DE LA CONSULTA ACTUAL (desde consulta_inicio),
+    // NO todo el historial. Así una molestia vieja o abandonada (p. ej. "dolor en el
+    // pecho" de una consulta anterior) no contamina ni escala por error una consulta
+    // nueva y distinta (p. ej. la fiebre de un bebé).
     $userMsgs = [];
-    foreach ($_SESSION['messages'] as $m) {
-        if (($m['role'] ?? '') === 'user') { $userMsgs[] = (string) ($m['content'] ?? ''); }
+    foreach ($_SESSION['messages'] as $i => $m) {
+        if ($i >= $inicioConsulta && ($m['role'] ?? '') === 'user') { $userMsgs[] = (string) ($m['content'] ?? ''); }
     }
     $sintomasTexto = implode(' ', array_slice($userMsgs, -2));
 
@@ -422,6 +454,20 @@ try {
                     // La respuesta del paciente fue ininteligible: pedimos que la repita.
                     $resultado       = ['tipo' => 'aclaracion'];
                     $pedirAclaracion = true;
+                    break;
+
+                case 'nuevo_sintoma':
+                    // El paciente cambió de motivo de consulta (o consulta por otra
+                    // persona). Se reinicia la consulta: el síntoma viejo deja de
+                    // alimentar el triaje, la estimación y el historial.
+                    $resultado = [
+                        'tipo'        => 'nuevo_sintoma',
+                        'instruccion' => 'El paciente cambió de motivo de consulta. Reconoce '
+                            . 'brevemente el cambio, muestra empatía por el síntoma nuevo y haz '
+                            . 'UNA sola pregunta de seguimiento sobre ese síntoma nuevo. NO '
+                            . 'estimes todavía ningún copago ni menciones el síntoma anterior.',
+                    ];
+                    $cambioSintoma = true;
                     break;
 
                 case 'buscar_copago':
@@ -467,6 +513,20 @@ try {
             $_SESSION['messages'][] = $choice;
             $datos = null;
         } else {
+            if ($cambioSintoma) {
+                // Reiniciar la consulta: desde esta marca el conteo de turnos, el
+                // triaje y el historial solo miran el síntoma NUEVO. El mensaje
+                // actual pasa a ser el turno 1 de la consulta nueva (Clara pregunta
+                // ahora y el siguiente mensaje del paciente dispara la estimación).
+                $idxUltimoUser = 0;
+                foreach ($_SESSION['messages'] as $i => $m) {
+                    if (($m['role'] ?? '') === 'user') { $idxUltimoUser = $i; }
+                }
+                $_SESSION['consulta_inicio'] = $idxUltimoUser;
+                $_SESSION['sintoma_inicial'] = $mensaje;
+                $guardrailsActivos[] = 'C_nuevo_sintoma_detectado';
+                gr_log('C_nuevo_sintoma_detectado', ['sintoma_nuevo' => mb_substr($mensaje, 0, 200)]);
+            }
             // Segunda llamada: el modelo redacta la respuesta final con los datos reales.
             // Aquí solo tiene que escribir UNA frase, así que NO se reenvían las
             // definiciones de herramientas (unos 2.000 tokens menos por turno).
@@ -482,6 +542,9 @@ try {
             }
             $choice = $resp2['choices'][0]['message'];
             $_SESSION['messages'][] = $choice;
+            if ($cambioSintoma) {
+                $datos = null;   // aún no hay estimación del síntoma nuevo: sin tarjeta
+            }
         }
     }
 
